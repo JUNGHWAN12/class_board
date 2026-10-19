@@ -1,0 +1,27 @@
+# Supabase 무료 프로젝트는 1주일 넘게 요청이 없으면 일시정지됩니다.
+# 3일마다 가벼운 요청을 보내 깨어 있게 합니다.
+# 저장소 Settings > Secrets and variables > Actions 에 SUPABASE_URL, SUPABASE_ANON_KEY 를 넣어주세요.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: "0 0 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "SUPABASE_URL / SUPABASE_ANON_KEY 시크릿이 없어 건너뜁니다."
+            exit 0
+          fi
+          curl -fsS -X POST "$SUPABASE_URL/rest/v1/rpc/ping" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" -d '{}'
