@@ -3,7 +3,7 @@
 import { useAuth } from "./AuthProvider";
 import { AppHeader, CLASS_NAME } from "./AppHeader";
 import { DemoFooter } from "./DemoFooter";
-import { SCHOOL_DOMAIN } from "@/lib/store";
+import { SCHOOL_DOMAINS } from "@/lib/store";
 
 // 로그인 + 학교 계정 확인을 통과해야 children 을 보여줍니다.
 // 체험 모드(Supabase 키 없음)에서는 가상 사용자로 바로 들어갑니다.
@@ -36,7 +36,9 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         <p className="font-semibold">학교 계정이 아닙니다.</p>
         <p className="mt-2 text-sm text-ink-soft">
           {email} 계정으로는 들어갈 수 없습니다.
-          {SCHOOL_DOMAIN && <> @{SCHOOL_DOMAIN} 계정으로 다시 로그인해주세요.</>}
+          {SCHOOL_DOMAINS.length > 0 && (
+            <> {SCHOOL_DOMAINS.map((d) => `@${d}`).join(", ")} 계정으로 다시 로그인해주세요.</>
+          )}
         </p>
         <button onClick={signOut} className="mt-6 rounded-xl bg-school px-4 py-2 text-white">
           다른 계정으로 로그인

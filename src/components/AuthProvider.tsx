@@ -3,7 +3,7 @@
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { getDemoUser, onDemoUserChange, setDemoUser, type DemoUser } from "@/lib/demo/users";
-import { getSupabase, isConfigured, SCHOOL_DOMAIN } from "@/lib/store/supabaseClient";
+import { getSupabase, isConfigured, SCHOOL_DOMAINS } from "@/lib/store/supabaseClient";
 
 type AuthState = {
   demo: boolean; // Supabase 없이 가상 사용자로 체험하는 중
@@ -115,8 +115,12 @@ function SupabaseAuth({ children }: { children: React.ReactNode }) {
       provider: "google",
       options: {
         redirectTo: window.location.href,
-        // hd: 구글 로그인 화면에서 학교 계정만 보이도록 안내 (실제 차단은 DB 에서 합니다)
-        queryParams: SCHOOL_DOMAIN ? { hd: SCHOOL_DOMAIN, prompt: "select_account" } : { prompt: "select_account" },
+        // hd: 구글 로그인 화면에서 학교 계정만 보이도록 안내 (실제 차단은 DB 에서 합니다).
+        // hd 는 도메인을 하나만 받아서, 도메인이 여러 개면 넘기지 않습니다.
+        queryParams:
+          SCHOOL_DOMAINS.length === 1
+            ? { hd: SCHOOL_DOMAINS[0], prompt: "select_account" }
+            : { prompt: "select_account" },
       },
     });
   }, []);

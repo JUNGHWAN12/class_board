@@ -47,10 +47,10 @@ Supabase 키를 넣으면 같은 화면이 실제 DB·구글 로그인으로 동
 
 ### 1. Supabase 프로젝트 만들기
 1. https://supabase.com 에서 새 프로젝트를 만듭니다 (Free, 지역은 Seoul 추천).
-2. **SQL Editor** 에 `supabase/migrations/0001_init.sql`, `0002_topic_boards.sql`, `0003_computer_class.sql` 내용을 차례로 통째로 붙여넣고 실행합니다.
+2. **SQL Editor** 에 `supabase/migrations/0001_init.sql`, `0002_topic_boards.sql`, `0003_computer_class.sql`, `0004_school_domains.sql` 내용을 차례로 통째로 붙여넣고 실행합니다.
 3. 같은 SQL Editor 에서 학교 도메인과 교사 이메일을 넣습니다.
    ```sql
-   update app_config set allowed_domain = 'school.kr';   -- 학교 구글 도메인
+   insert into school_domains (domain) values ('onedu.jje.go.kr');  -- 학교 구글 도메인마다 한 줄 (비워 두면 모든 구글 계정 허용)
    insert into teachers (email) values ('teacher@school.kr');  -- 교사마다 한 줄
    ```
 
@@ -64,7 +64,7 @@ Supabase 키를 넣으면 같은 화면이 실제 DB·구글 로그인으로 동
 1. https://vercel.com 에서 이 GitHub 저장소를 가져옵니다.
 2. 환경 변수 3개를 넣습니다 (`.env.example` 참고).
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase > Project Settings > API)
-   - `NEXT_PUBLIC_SCHOOL_DOMAIN` (예: `school.kr`)
+   - `NEXT_PUBLIC_SCHOOL_DOMAIN` (예: `onedu.jje.go.kr`, 여러 개면 쉼표로 구분)
 3. Deploy.
 
 ### 4. 일시정지 방지

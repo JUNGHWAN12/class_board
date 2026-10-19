@@ -4,7 +4,7 @@ import { supabaseStore } from "./supabaseStore";
 import type { BoardStore } from "./types";
 
 export type { BoardStore } from "./types";
-export { isConfigured, SCHOOL_DOMAIN } from "./supabaseClient";
+export { isConfigured, SCHOOL_DOMAINS } from "./supabaseClient";
 
 // Supabase 키가 있으면 실제 DB, 없으면 체험 모드(브라우저 저장)
 export function getStore(): BoardStore {
