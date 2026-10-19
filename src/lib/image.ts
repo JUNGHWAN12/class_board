@@ -2,9 +2,9 @@
 const MAX_SIDE = 1280;
 const QUALITY = 0.8;
 
-export async function compressImage(file: File): Promise<Blob> {
+export async function compressImage(file: File, maxSide = MAX_SIDE, quality = QUALITY): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const width = Math.round(bitmap.width * scale);
   const height = Math.round(bitmap.height * scale);
 
@@ -22,7 +22,7 @@ export async function compressImage(file: File): Promise<Blob> {
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error("이미지 변환 실패"))),
       "image/jpeg",
-      QUALITY,
+      quality,
     ),
   );
 }

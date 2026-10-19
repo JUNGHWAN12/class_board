@@ -1,83 +1,64 @@
 "use client";
 
-import Link from "next/link";
 import { useAuth } from "./AuthProvider";
-import { isConfigured, SCHOOL_DOMAIN } from "@/lib/supabase";
-
-export function Header() {
-  const { session, name, isTeacher, signOut } = useAuth();
-  return (
-    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-        <Link href="/" className="text-lg font-bold text-slate-800">
-          📋 수업 게시판
-        </Link>
-        {session && (
-          <div className="flex items-center gap-3 text-sm">
-            <span className="hidden text-slate-600 sm:inline">
-              {name}
-              {isTeacher && (
-                <span className="ml-1 rounded bg-indigo-100 px-1.5 py-0.5 text-xs text-indigo-700">교사</span>
-              )}
-            </span>
-            <button onClick={signOut} className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100">
-              로그아웃
-            </button>
-          </div>
-        )}
-      </div>
-    </header>
-  );
-}
+import { AppHeader, CLASS_NAME } from "./AppHeader";
+import { DemoFooter } from "./DemoFooter";
+import { SCHOOL_DOMAIN } from "@/lib/store";
 
 // 로그인 + 학교 계정 확인을 통과해야 children 을 보여줍니다.
+// 체험 모드(Supabase 키 없음)에서는 가상 사용자로 바로 들어갑니다.
 export function AuthGate({ children }: { children: React.ReactNode }) {
-  const { loading, session, isSchoolUser, email, signIn, signOut } = useAuth();
+  const { loading, signedIn, isSchoolUser, email, signIn, signOut } = useAuth();
 
-  if (!isConfigured()) {
+  if (loading) {
     return (
-      <Center>
-        <p className="font-semibold">아직 Supabase 연결 설정이 없습니다.</p>
-        <p className="mt-2 text-sm text-slate-500">README 의 설정 방법에 따라 환경 변수를 넣어주세요.</p>
-      </Center>
+      <Shell>
+        <p className="text-muted">불러오는 중…</p>
+      </Shell>
     );
   }
-  if (loading) {
-    return <Center><p className="text-slate-500">불러오는 중…</p></Center>;
-  }
-  if (!session) {
+  if (!signedIn) {
     return (
-      <Center>
-        <h1 className="text-2xl font-bold text-slate-800">수업 게시판</h1>
-        <p className="mt-2 text-slate-500">학교 구글 계정으로 로그인하세요.</p>
+      <Shell>
+        <p className="text-ink-soft">학교 구글 계정으로 로그인하세요.</p>
         <button
           onClick={signIn}
-          className="mt-6 inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-3 font-medium shadow-sm hover:bg-slate-50"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl border border-line bg-white px-5 py-3 font-medium shadow-sm hover:bg-paper"
         >
           <GoogleIcon /> 구글 계정으로 로그인
         </button>
-      </Center>
+      </Shell>
     );
   }
   if (!isSchoolUser) {
     return (
-      <Center>
+      <Shell>
         <p className="font-semibold">학교 계정이 아닙니다.</p>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-ink-soft">
           {email} 계정으로는 들어갈 수 없습니다.
           {SCHOOL_DOMAIN && <> @{SCHOOL_DOMAIN} 계정으로 다시 로그인해주세요.</>}
         </p>
-        <button onClick={signOut} className="mt-6 rounded-lg bg-slate-800 px-4 py-2 text-white">
+        <button onClick={signOut} className="mt-6 rounded-xl bg-school px-4 py-2 text-white">
           다른 계정으로 로그인
         </button>
-      </Center>
+      </Shell>
     );
   }
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <DemoFooter />
+    </>
+  );
 }
 
-function Center({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">{children}</div>;
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <AppHeader subTitle={CLASS_NAME} title="우리 반 게시판" />
+      <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">{children}</div>
+    </>
+  );
 }
 
 function GoogleIcon() {

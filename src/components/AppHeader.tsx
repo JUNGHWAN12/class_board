@@ -1,0 +1,77 @@
+"use client";
+
+import Link from "next/link";
+import { useAuth } from "./AuthProvider";
+import { DEMO_STUDENTS, DEMO_TEACHER } from "@/lib/demo/users";
+
+// 반 이름은 아직 고정값입니다. (나중에 반 설정이 생기면 그 값으로 바꿉니다)
+export const CLASS_NAME = "2학년 3반";
+
+type Props = { subTitle: string; title: string; back?: boolean };
+
+export function AppHeader({ subTitle, title, back }: Props) {
+  const { demo, signedIn, name, isTeacher, switchDemoUser, signOut } = useAuth();
+  return (
+    <header className="bg-school text-white">
+      <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-3.5">
+          {back && (
+            <Link href="/" className="pill-btn">
+              ← <span className="hidden sm:inline">게시판&nbsp;</span>목록
+            </Link>
+          )}
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-[13px] text-mint">{subTitle}</span>
+            <h1 className="truncate font-display text-[30px] leading-tight">{title}</h1>
+          </div>
+        </div>
+        {signedIn && (
+          <div className="flex flex-wrap items-center gap-2.5">
+            {demo && (
+              <button
+                type="button"
+                className="pill-btn"
+                onClick={() => switchDemoUser(isTeacher ? DEMO_STUDENTS[0].id : DEMO_TEACHER.id)}
+              >
+                {isTeacher ? "학생 화면으로 보기" : "교사 화면으로 보기"}
+              </button>
+            )}
+            <span className="flex h-10 items-center gap-2 rounded-full bg-school-mid py-0 pl-1 pr-3.5 text-sm">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sun text-ink" aria-hidden>
+                {initialOf(name, isTeacher)}
+              </span>
+              {demo && !isTeacher ? (
+                <select
+                  aria-label="체험할 학생 고르기"
+                  value={DEMO_STUDENTS.find((s) => s.name === name)?.id}
+                  onChange={(e) => switchDemoUser(e.target.value)}
+                  className="cursor-pointer bg-transparent text-white outline-none [&>option]:text-ink"
+                >
+                  {DEMO_STUDENTS.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} · 학교 계정
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span>{name}</span>
+              )}
+            </span>
+            {!demo && (
+              <button type="button" onClick={signOut} className="pill-btn">
+                로그아웃
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
+
+export function initialOf(name: string, teacher = false) {
+  if (teacher) return "선";
+  // 한국 이름은 성을 빼고 이름 첫 글자 (김서연 → 서)
+  const n = name.trim();
+  return /^[가-힣]{3}$/.test(n) ? n[1] : n.slice(0, 1);
+}

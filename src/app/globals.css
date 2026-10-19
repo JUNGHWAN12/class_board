@@ -1,6 +1,84 @@
 @import "tailwindcss";
 
-body {
-  font-family:
-    "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+/* UI 초안 통합안의 공통 테마: 학교 초록 머리글, 노란 글쓰기 버튼 */
+@theme {
+  --color-school: #1f5c4a;
+  --color-school-dark: #123a2f;
+  --color-school-mid: #2a6e5a;
+  --color-mint: #cfe3da;
+  --color-leaf: #ddefe6;
+  --color-sage: #e6edea;
+  --color-tab: #ebf0ee;
+  --color-paper: #f4f6f5;
+  --color-line: #d5ddda;
+  --color-line-soft: #e3e9e6;
+  --color-ink: #1c2b27;
+  --color-ink-soft: #3f4c47;
+  --color-muted: #51605b;
+  --color-sun: #f6d365;
+  --color-cream: #fdf6da;
+  --color-cream-line: #eadfb0;
+  --color-cream-ink: #3b3418;
+  --color-danger: #9e2f2f;
+
+  --font-display: "Do Hyeon", "Gowun Dodum", sans-serif;
+  --font-body: "Gowun Dodum", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: var(--font-body);
+  }
+  a {
+    color: var(--color-school);
+  }
+  a:hover {
+    color: var(--color-school-dark);
+  }
+}
+
+@layer components {
+  /* 머리글의 둥근 테두리 버튼 */
+  .pill-btn {
+    display: inline-flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--color-mint);
+    border-radius: 20px;
+    background: transparent;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .pill-btn:hover {
+    color: #fff;
+    background: var(--color-school-mid);
+  }
+  /* 노란 글쓰기 버튼 */
+  .write-btn {
+    height: 44px;
+    padding: 0 20px;
+    border-radius: 22px;
+    background: var(--color-sun);
+    color: var(--color-ink);
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .write-btn:disabled {
+    background: var(--color-line);
+    color: var(--color-muted);
+    cursor: not-allowed;
+  }
+  .field {
+    width: 100%;
+    border: 1px solid var(--color-line);
+    border-radius: 10px;
+    padding: 8px 12px;
+    background: #fff;
+  }
+  .field:focus {
+    outline: 2px solid var(--color-school);
+    outline-offset: -1px;
+  }
 }
