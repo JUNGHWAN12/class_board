@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { RichText } from "./RichText";
 import {
   Avatar,
   clockTime,
   displayTitle,
   EmptyState,
   HiddenBadge,
+  KindBadge,
   LikeButton,
   PostPhoto,
   TeacherPostTools,
@@ -41,9 +43,10 @@ export function WallView(p: ViewProps) {
               <HiddenBadge />
             </div>
           )}
-          {post.title && <h2 className="mb-2 font-display text-[21px] leading-tight">{post.title}</h2>}
+          <KindBadge post={post} />
+          {post.title && <h2 className="mb-2 mt-1 font-display text-[21px] leading-tight">{post.title}</h2>}
           <PostPhoto src={p.imageUrl(post.image_path)} className="max-h-[260px] rounded-sm" />
-          <p className="my-2 whitespace-pre-wrap break-words text-[15px] leading-normal">{post.content}</p>
+          <RichText text={post.content} foldLines={10} className="my-2 text-[15px] leading-normal" />
           <div className="flex items-center justify-between text-[13px] text-ink-soft">
             <span>
               {post.author_name} · {timeAgo(post.created_at)}
@@ -84,6 +87,7 @@ export function ListView(p: ViewProps) {
                 <button type="button" onClick={() => p.onOpen(post.id)} className="text-left text-school hover:underline">
                   {displayTitle(post)}
                 </button>{" "}
+                <KindBadge post={post} />{" "}
                 <span className="text-xs text-muted">
                   {post.section && `[${post.section}]`}
                   {post.image_path && " [사진]"}
@@ -123,16 +127,17 @@ export function FeedView(p: ViewProps) {
                 {post.section && ` · ${post.section}`}
               </div>
             </div>
+            <KindBadge post={post} />
             {post.is_hidden && <HiddenBadge />}
           </div>
           <button type="button" className="block w-full" onClick={() => p.onOpen(post.id)}>
             <PostPhoto src={p.imageUrl(post.image_path)} className="max-h-[520px]" />
           </button>
           <div className="flex flex-col gap-1.5 px-3.5 py-3">
-            <p className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">
-              {post.title && <b>{post.title} </b>}
-              {post.content}
-            </p>
+            <div className="text-[15px] leading-relaxed">
+              {post.title && <b className="block">{post.title}</b>}
+              <RichText text={post.content} foldLines={15} />
+            </div>
             <div className="-ml-2 flex items-center text-sm text-ink-soft">
               <LikeButton post={post} liked={p.myLikes.has(post.id)} onLike={() => p.onLike(post)} />
               <button type="button" className="rounded-lg px-2 py-1 hover:bg-black/5" onClick={() => p.onOpen(post.id)}>
@@ -178,6 +183,7 @@ export function GroupView(p: ViewProps) {
                 }`}
               >
                 {post.is_hidden && <HiddenBadge />}
+                <KindBadge post={post} />
                 <PostPhoto src={p.imageUrl(post.image_path)} className="h-[90px] rounded-md" />
                 <b className="text-[15px]">{displayTitle(post)}</b>
                 <span className="flex items-center gap-1 text-[13px] text-ink-soft">
@@ -232,18 +238,22 @@ export function ChatView(p: ViewProps) {
             <div key={post.id} className={`flex max-w-[520px] items-end gap-2.5 ${mine ? "flex-row-reverse self-end" : ""}`}>
               {!mine && <Avatar name={post.author_name} url={post.author_avatar} />}
               <div className={`flex min-w-0 flex-col gap-1 ${mine ? "items-end" : ""}`}>
-                {!mine && <span className="text-[13px] text-ink-soft">{post.author_name}</span>}
+                <span className="flex items-center gap-1 text-[13px] text-ink-soft">
+                  {!mine && post.author_name} <KindBadge post={post} />
+                </span>
                 {post.is_hidden && <HiddenBadge />}
-                <button
-                  type="button"
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => p.onOpen(post.id)}
-                  className={`whitespace-pre-wrap break-words px-3.5 py-2.5 text-left text-[15px] leading-normal ${
+                  onKeyDown={(e) => e.key === "Enter" && p.onOpen(post.id)}
+                  className={`max-w-full cursor-pointer px-3.5 py-2.5 text-left text-[15px] leading-normal ${
                     mine ? "rounded-[16px_4px_16px_16px] bg-school text-white" : "rounded-[4px_16px_16px_16px] bg-white"
                   } ${post.is_hidden ? "opacity-60" : ""}`}
                 >
-                  {post.title && <b>{post.title} </b>}
-                  {post.content}
-                </button>
+                  {post.title && <b className="block">{post.title}</b>}
+                  <RichText text={post.content} dark={mine} foldLines={10} />
+                </div>
                 {post.image_path && (
                   <button type="button" onClick={() => p.onOpen(post.id)} className="w-[220px] overflow-hidden rounded-xl">
                     <PostPhoto src={p.imageUrl(post.image_path)} className="h-[130px]" />

@@ -1,7 +1,7 @@
-import type { Board, Comment, Post, ViewKey } from "@/lib/types";
+import type { Board, Comment, Post, PostKind, RevealMode, ViewKey } from "@/lib/types";
 import { DEMO_STUDENTS, DEMO_TEACHER, demoUserByName } from "./users";
 
-// 체험 모드 첫 실행 때 채워 넣는 예시 데이터 (UI 초안 통합안의 주제 게시판 5개).
+// 체험 모드 첫 실행 때 채워 넣는 예시 데이터 (정보·인공지능 기초·데이터 과학 주제 게시판 5개).
 
 export type DemoDb = {
   version: number;
@@ -11,7 +11,7 @@ export type DemoDb = {
   likes: string[]; // `${postId}|${userId}`
 };
 
-export const DEMO_DB_VERSION = 1;
+export const DEMO_DB_VERSION = 3;
 
 // 실제 사진 대신 쓰는 그림 (SVG). 학생이 체험 모드에서 올린 사진은 실제 사진으로 저장됩니다.
 function photo(emoji: string, caption: string, bg: string, ratio = 0.75) {
@@ -33,8 +33,11 @@ type SeedPost = {
   section: string;
   likes: number;
   comments: number;
+  kind?: PostKind;
   photo?: string;
   hidden?: boolean;
+  answer?: string; // 첫 댓글로 다는 선생님 답변
+  solved?: boolean; // 선생님 답변을 채택한 질문
 };
 
 type SeedBoard = {
@@ -43,108 +46,114 @@ type SeedBoard = {
   title: string;
   desc: string;
   view: ViewKey;
+  kind: PostKind;
+  reveal?: RevealMode;
   notice: string;
   sections: string[];
   locked?: boolean;
   posts: SeedPost[];
 };
 
+// 질문 양식으로 쓴 글과 같은 모양 (PostComposer 의 buildQuestion 참고)
+function question(lang: string, code: string, error: string, tried: string) {
+  return "```" + lang + "\n" + code + "\n```\n```error\n" + error + "\n```\n해 본 것: " + tried;
+}
+
 const BOARDS: SeedBoard[] = [
   {
-    id: "plant",
-    subject: "과학 · 관찰",
-    title: "봄 식물 찾기",
-    desc: "동네에서 찾은 봄 식물 사진과 특징을 올려요.",
+    id: "python",
+    subject: "정보 · 프로그래밍",
+    title: "파이썬 코드 나눔",
+    desc: "오늘 실습한 코드를 올리고 서로 고쳐 줘요.",
     view: "wall",
-    notice: "직접 찍은 식물 사진 1장과 특징 한 문장을 올려 주세요.",
-    sections: ["꽃", "나무", "풀", "질문"],
+    kind: "code",
+    notice: "[코드 넣기] 버튼으로 코드를 넣고, 실행 결과도 한 줄 적어 주세요.",
+    sections: ["반복문", "조건문", "함수", "질문"],
     posts: [
-      { title: "학교 화단 민들레", body: "점심시간에 화단에서 찾았어요. 꽃잎이 생각보다 훨씬 많아요.", author: "김서연", section: "꽃", likes: 12, comments: 3, photo: photo("🌼", "학교 화단", "#F6D365") },
-      { title: "질문 있어요!", body: "개나리랑 영춘화는 어떻게 구분하나요?", author: "박지호", section: "질문", likes: 5, comments: 4 },
-      { title: "냉이 꽃", body: "할머니가 알려주셨어요. 아주 작은 흰 꽃이 피어요.", author: "최하은", section: "풀", likes: 15, comments: 2, photo: photo("🌿", "뒷산 길가", "#BFE3C8", 1) },
-      { title: "아파트 앞 벚꽃", body: "꽃잎이 다섯 장이고 꽃자루가 길어요.", author: "이도윤", section: "나무", likes: 8, comments: 2, photo: photo("🌸", "아파트 앞", "#F8D7DF", 0.66) },
-      { title: "제비꽃 관찰 기록", body: "잎 모양이 하트처럼 생겼고 꽃은 보라색이에요.", author: "정우진", section: "꽃", likes: 3, comments: 1 },
-      { title: "수업과 관계없는 글", body: "선생님만 볼 수 있는 숨긴 글이에요.", author: "한서준", section: "풀", likes: 0, comments: 0, hidden: true },
+      { title: "구구단 2단 출력", body: "for 문으로 2단을 출력했어요.\n```python\nfor i in range(1, 10):\n    print(2, 'x', i, '=', 2 * i)\n```", author: "김서연", section: "반복문", likes: 12, comments: 3 },
+      { title: "짝수 홀수 판별", body: "입력한 수가 짝수인지 알려 줘요.\n```python\nn = int(input('수: '))\nif n % 2 == 0:\n    print('짝수')  # 2로 나눈 나머지가 0\nelse:\n    print('홀수')\n```", author: "이도윤", section: "조건문", likes: 8, comments: 2 },
+      { title: "range 끝 숫자가 안 나와요", kind: "question", body: question("python", "for i in range(10):\n    print(i)", "0부터 9까지만 출력되고 10이 안 나와요", "range(11) 로 바꾸니 10까지 나오긴 하는데 이유를 모르겠어요."), author: "박지호", section: "질문", likes: 5, comments: 3, answer: "range(a, b) 는 b 바로 앞에서 멈춰요. range(10) 은 0~9 열 개를 만들어요.", solved: true },
+      { title: "최댓값 함수 만들기", body: "max() 없이 직접 만들어 봤어요.\n```python\ndef my_max(nums):\n    best = nums[0]\n    for x in nums:\n        if x > best:\n            best = x\n    return best\n\nprint(my_max([3, 9, 4]))  # 9\n```", author: "최하은", section: "함수", likes: 15, comments: 2 },
+      { title: "별 찍기", body: "```python\nfor i in range(1, 6):\n    print('*' * i)\n```\n결과가 삼각형 모양으로 나와요.", author: "정우진", section: "반복문", likes: 3, comments: 1 },
+      { title: "수업과 관계없는 글", kind: "general", body: "선생님만 볼 수 있는 숨긴 글이에요.", author: "한서준", section: "질문", likes: 0, comments: 0, hidden: true },
     ],
   },
   {
-    id: "exp",
-    subject: "과학 · 실험",
-    title: "광합성 실험 결과",
-    desc: "모둠별 실험 결과와 측정값을 정리해요.",
+    id: "ai",
+    subject: "인공지능 기초 · 실험",
+    title: "AI 모델 실험 결과",
+    desc: "모둠별로 만든 분류 모델의 정확도와 느낀 점을 정리해요.",
     view: "group",
-    notice: "모둠 대표 한 명이 결과를 올려 주세요.",
+    kind: "general",
+    notice: "모둠 대표 한 명이 정확도와 잘못 분류한 예시를 올려 주세요.",
     sections: ["1모둠", "2모둠", "3모둠", "4모둠"],
     locked: true,
     posts: [
-      { title: "빛 세기에 따른 기포 수", body: "전등을 가까이 할수록 기포가 많이 나왔어요.", author: "김민준", section: "1모둠", likes: 9, comments: 2, photo: photo("💡", "1모둠 실험대", "#FFF3B8") },
-      { title: "수온 실험", body: "따뜻한 물에서 기포가 더 빨리 생겼어요.", author: "윤지아", section: "2모둠", likes: 6, comments: 1 },
-      { title: "실패한 이유", body: "물풀을 너무 오래 꺼내 둬서 기포가 거의 없었어요.", author: "오승우", section: "3모둠", likes: 11, comments: 3 },
-      { title: "측정표", body: "1분마다 기포 수를 셌어요: 4, 7, 11, 12", author: "장예린", section: "4모둠", likes: 7, comments: 0, photo: photo("📊", "측정표", "#E3EAF6") },
+      { title: "가위바위보 분류 92%", body: "사진을 클래스마다 50장씩 학습시켰더니 정확도가 92%였어요. 보를 가위로 헷갈리는 경우가 많았어요.", author: "김민준", section: "1모둠", likes: 9, comments: 2, photo: photo("✌️", "티처블 머신 학습 화면", "#DDEFE6") },
+      { title: "재활용품 분류", body: "캔과 페트병은 잘 구분하는데, 구겨진 캔은 자주 틀렸어요.", author: "윤지아", section: "2모둠", likes: 6, comments: 1, photo: photo("♻️", "분류 결과", "#E3EAF6") },
+      { title: "데이터가 부족했던 이유", body: "배경이 모두 교실 책상이라 다른 장소에서는 정확도가 60%까지 떨어졌어요. 데이터의 다양성이 중요하다는 걸 알았어요.", author: "오승우", section: "3모둠", likes: 11, comments: 3 },
+      { title: "학습 횟수별 정확도", kind: "code", body: "```python\nfor epoch, acc in [(10, 0.71), (30, 0.85), (50, 0.88), (100, 0.87)]:\n    print(epoch, acc)\n```\n100번은 오히려 조금 떨어졌어요 (과적합?)", author: "장예린", section: "4모둠", likes: 7, comments: 0, photo: photo("📈", "정확도 변화", "#FFF3B8") },
     ],
   },
   {
     id: "qna",
-    subject: "과학 · 질문",
-    title: "우리 반 질문방",
-    desc: "수업 중에 궁금한 점을 바로 물어봐요.",
+    subject: "정보 · 질문",
+    title: "코딩 질문방",
+    desc: "수업 중에 막힌 부분을 바로 물어봐요.",
     view: "chat",
-    notice: "친구 질문에 답할 수 있으면 먼저 답해 주세요.",
-    sections: ["수업 질문", "과제 질문"],
+    kind: "question",
+    notice: "질문을 고르면 내 코드, 에러 메시지, 해 본 것을 적는 칸이 나와요. 친구 질문에 먼저 답해 줘도 좋아요.",
+    sections: ["문법 질문", "오류 질문"],
     posts: [
-      { title: "", body: "선생님, 엽록체는 동물 세포에도 있나요?", author: "박지호", section: "수업 질문", likes: 4, comments: 2 },
-      { title: "", body: "수행평가 사진은 몇 장까지 올려요?", author: "김서연", section: "과제 질문", likes: 2, comments: 1 },
-      { title: "", body: "광합성 식 다시 알려 주실 수 있나요?", author: "이도윤", section: "수업 질문", likes: 6, comments: 2 },
+      { title: "", kind: "question", body: question("python", "if score >= 90:\nprint('A')", "  File \"main.py\", line 2\n    print('A')\n    ^\nIndentationError: expected an indented block", "콜론은 붙였는데 계속 같은 에러가 나요."), author: "박지호", section: "오류 질문", likes: 4, comments: 2, answer: "if 다음 줄은 스페이스 4칸 들여써야 해요. 글쓰기 창에서 Tab 키를 누르면 4칸이 들어가요.", solved: true },
+      { title: "", kind: "question", body: "리스트에서 `append` 랑 `insert` 는 뭐가 달라요?", author: "김서연", section: "문법 질문", likes: 2, comments: 1, answer: "append(x) 는 맨 뒤에 붙이고, insert(i, x) 는 i 번째 자리에 끼워 넣어요." },
+      { title: "", kind: "question", body: question("python", "while True:\n    n = int(input())\n    print(n * 2)", "프로그램이 끝나지 않아요", "Ctrl+C 로만 멈출 수 있어요."), author: "이도윤", section: "오류 질문", likes: 6, comments: 2 },
     ],
   },
   {
-    id: "gallery",
-    subject: "과학 · 사진",
-    title: "생태 사진전",
-    desc: "학교 주변 생물 사진을 크게 모아 봐요.",
+    id: "viz",
+    subject: "데이터 과학 · 시각화",
+    title: "데이터 시각화 갤러리",
+    desc: "공공데이터로 그린 그래프를 크게 모아 봐요.",
     view: "feed",
-    notice: "사진 아래에 찍은 장소를 적어 주세요.",
-    sections: ["식물", "곤충", "새"],
+    kind: "code",
+    notice: "그래프 아래에 데이터 출처와 알게 된 점 한 줄을 적어 주세요.",
+    sections: ["막대", "꺾은선", "산점도"],
     posts: [
-      { title: "비 온 뒤 달팽이", body: "체육관 뒤 화단에서 찍었어요.", author: "최하은", section: "곤충", likes: 18, comments: 3, photo: photo("🐌", "체육관 뒤 화단", "#CFE3DA") },
-      { title: "운동장 까치", body: "둥지 재료를 물고 가고 있었어요.", author: "정우진", section: "새", likes: 13, comments: 2, photo: photo("🐦", "운동장 나무", "#DCE8F5") },
-      { title: "꿀벌과 유채꽃", body: "가까이 가도 도망가지 않았어요.", author: "한서준", section: "곤충", likes: 10, comments: 1, photo: photo("🐝", "정문 꽃밭", "#FCEFB4") },
+      { title: "우리 지역 월별 기온", body: "기상청 자료로 그렸어요. 8월이 가장 덥고 1월이 가장 추워요.\n```python\nplt.plot(df['월'], df['평균기온'], marker='o')\nplt.show()\n```", author: "최하은", section: "꺾은선", likes: 18, comments: 3, photo: photo("📈", "월별 평균 기온", "#CFE3DA") },
+      { title: "급식 메뉴 인기 투표", body: "우리 반 28명 설문 결과예요. 1위는 돈가스!", author: "정우진", section: "막대", likes: 13, comments: 2, photo: photo("📊", "메뉴별 득표 수", "#FCEFB4") },
+      { title: "공부 시간과 수면 시간", body: "공부 시간이 길다고 수면 시간이 꼭 짧지는 않았어요. 상관관계가 약해요.", author: "한서준", section: "산점도", likes: 10, comments: 1, photo: photo("🔵", "산점도", "#DCE8F5") },
     ],
   },
   {
-    id: "report",
-    subject: "과학 · 과제",
-    title: "탐구 보고서 제출함",
-    desc: "수행평가 탐구 보고서를 올리고 서로 읽어요.",
+    id: "project",
+    subject: "데이터 과학 · 과제",
+    title: "탐구 프로젝트 제출함",
+    desc: "데이터 탐구 보고서를 올리면 친구들 보고서를 볼 수 있어요.",
     view: "list",
-    notice: "제출 기한은 금요일까지예요.",
+    kind: "assignment",
+    reveal: "after_submit",
+    notice: "제출 기한은 금요일까지예요. 코드와 데이터 출처를 꼭 넣어 주세요.",
     sections: ["1차 제출", "2차 제출"],
     posts: [
-      { title: "식물의 증산 작용 보고서", body: "비닐봉지 실험으로 증산량을 비교했어요. 햇빛이 드는 곳에 둔 봉지에 물방울이 두 배 정도 더 많이 맺혔어요.", author: "김서연", section: "1차 제출", likes: 7, comments: 2, photo: photo("🧪", "증산 작용 실험", "#DDEFE6") },
-      { title: "광합성 속도 탐구", body: "빛의 색깔에 따라 기포 수를 비교했어요. 빨간빛과 파란빛에서 기포가 가장 많았어요.", author: "김민준", section: "1차 제출", likes: 5, comments: 1 },
-      { title: "양파 표피 세포 관찰", body: "현미경 사진과 그림을 함께 정리했어요.", author: "윤지아", section: "2차 제출", likes: 9, comments: 3, photo: photo("🔬", "현미경 100배", "#E8E0F5") },
-      { title: "잎맥 모양 비교", body: "나란히맥과 그물맥 잎 10장을 비교했어요.", author: "오승우", section: "2차 제출", likes: 4, comments: 0 },
+      { title: "따릉이 대여량과 날씨", body: "비 오는 날은 대여량이 평균 40% 줄었어요. pandas로 날씨별로 묶어서 비교했어요.\n```python\ndf.groupby('날씨')['대여량'].mean()\n```", author: "김민준", section: "1차 제출", likes: 7, comments: 2, photo: photo("🚲", "날씨별 평균 대여량", "#DDEFE6") },
+      { title: "교실 소음 측정", body: "마이크로비트로 쉬는 시간과 수업 시간 소음을 비교했어요.", author: "강하린", section: "1차 제출", likes: 5, comments: 1 },
+      { title: "학교 앞 미세먼지 분석", body: "등교 시간대 미세먼지가 가장 높았어요. 요일별 차이도 정리했어요.", author: "윤지아", section: "2차 제출", likes: 9, comments: 3, photo: photo("🌫️", "시간대별 미세먼지", "#E8E0F5") },
+      { title: "유튜브 조회수 예측", body: "제목 길이와 조회수의 관계를 선형 회귀로 살펴봤어요.\n```python\nfrom sklearn.linear_model import LinearRegression\nmodel = LinearRegression().fit(X, y)\nprint(model.score(X, y))\n```", author: "오승우", section: "2차 제출", likes: 4, comments: 0 },
     ],
   },
 ];
 
 const COMMENT_POOL = [
-  "저도 비슷한 걸 봤어요!",
-  "사진이 정말 선명해요.",
-  "어디서 찾았는지 궁금해요.",
-  "좋은 관찰이에요 👍",
-  "다음 시간에 같이 확인해 봐요.",
-  "저는 조금 다르게 생각했어요. 빛 때문이 아닐까요?",
-  "정리가 깔끔해서 이해가 잘 돼요.",
+  "저도 같은 오류가 났었어요!",
+  "코드가 깔끔해서 이해가 잘 돼요.",
+  "변수 이름을 더 알아보기 쉽게 바꾸면 좋겠어요.",
+  "좋은 아이디어예요 👍",
+  "실행해 보니 잘 돼요.",
+  "for 문 대신 while 로도 해 볼 수 있을 것 같아요.",
+  "그래프가 한눈에 들어와요.",
   "우리 모둠 결과랑 비슷해요.",
 ];
-
-// 질문방은 선생님 답변이 먼저 달리도록
-const TEACHER_ANSWERS: Record<string, string> = {
-  "선생님, 엽록체는 동물 세포에도 있나요?": "좋은 질문이에요. 엽록체는 식물 세포에만 있어요. 내일 현미경으로 같이 확인해 봐요.",
-  "수행평가 사진은 몇 장까지 올려요?": "최대 3장까지 올려 주세요.",
-  "광합성 식 다시 알려 주실 수 있나요?": "이산화 탄소 + 물 → (빛) → 포도당 + 산소 예요.",
-};
 
 export function createSeed(): DemoDb {
   const now = Date.now();
@@ -161,6 +170,9 @@ export function createSeed(): DemoDb {
       notice: b.notice,
       sections: b.sections,
       default_view: b.view,
+      default_kind: b.kind,
+      reveal_mode: b.reveal ?? "open",
+      revealed: false,
       allow_photos: true,
       owner_id: DEMO_TEACHER.id,
       is_locked: Boolean(b.locked),
@@ -173,33 +185,36 @@ export function createSeed(): DemoDb {
       const minutesAgo = 6 + pi * 7 + bi * 3;
       const postId = `${b.id}-${pi + 1}`;
       const author = demoUserByName(p.author);
-      db.posts.push({
+      const post: DemoDb["posts"][number] = {
         id: postId,
         board_id: b.id,
         author_id: author.id,
+        kind: p.kind ?? b.kind,
         title: p.title,
         content: p.body,
         section: p.section,
         image_path: p.photo ?? null,
+        solved_comment_id: null,
         is_hidden: Boolean(p.hidden),
         deleted_at: null,
         like_count: p.likes,
         comment_count: p.comments,
         created_at: iso(minutesAgo),
         updated_at: iso(minutesAgo),
-      });
+      };
+      db.posts.push(post);
 
       for (let c = 0; c < p.comments; c++) {
-        const teacherAnswer = c === 0 ? TEACHER_ANSWERS[p.body] : undefined;
-        const commenter = teacherAnswer
-          ? DEMO_TEACHER
-          : DEMO_STUDENTS[(pi * 3 + c * 5 + bi + 1) % DEMO_STUDENTS.length];
+        const answer = c === 0 ? p.answer : undefined;
+        const commenter = answer ? DEMO_TEACHER : DEMO_STUDENTS[(pi * 3 + c * 5 + bi + 1) % DEMO_STUDENTS.length];
         commentNo++;
+        const id = `c-${commentNo}`;
+        if (answer && p.solved) post.solved_comment_id = id;
         db.comments.push({
-          id: `c-${commentNo}`,
+          id,
           post_id: postId,
           author_id: commenter.id,
-          content: teacherAnswer ?? COMMENT_POOL[(commentNo * 3) % COMMENT_POOL.length],
+          content: answer ?? COMMENT_POOL[(commentNo * 3) % COMMENT_POOL.length],
           is_hidden: false,
           deleted_at: null,
           created_at: iso(minutesAgo - 1 - c),

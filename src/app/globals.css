@@ -21,6 +21,8 @@
   --color-cream-ink: #3b3418;
   --color-danger: #9e2f2f;
 
+  /* 코딩용 한글 글꼴: 0/O, 1/l/I 구분 (계획서 2-1) */
+  --font-mono: "Nanum Gothic Coding", "D2Coding", ui-monospace, Menlo, Consolas, monospace;
   --font-display: "Do Hyeon", "Gowun Dodum", sans-serif;
   --font-body: "Gowun Dodum", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
 }
@@ -81,4 +83,40 @@
     outline: 2px solid var(--color-school);
     outline-offset: -1px;
   }
+}
+
+/* 코드 상자 문법 색 (어두운 바탕) */
+.code-block .hljs-keyword,
+.code-block .hljs-selector-tag,
+.code-block .hljs-built_in,
+.code-block .hljs-literal {
+  color: #f6d365;
+}
+.code-block .hljs-string,
+.code-block .hljs-attr,
+.code-block .hljs-selector-attr {
+  color: #9fe0b5;
+}
+.code-block .hljs-number,
+.code-block .hljs-symbol {
+  color: #f7a98b;
+}
+.code-block .hljs-comment,
+.code-block .hljs-meta {
+  color: #7f9a90;
+  font-style: italic;
+}
+.code-block .hljs-title,
+.code-block .hljs-name,
+.code-block .hljs-selector-class,
+.code-block .hljs-selector-id {
+  color: #8ec5ff;
+}
+.code-block .hljs-type,
+.code-block .hljs-params,
+.code-block .hljs-variable {
+  color: #e6f2ec;
+}
+.code-block .hljs-tag {
+  color: #c4b5fd;
 }

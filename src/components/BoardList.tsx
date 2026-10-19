@@ -7,7 +7,7 @@ import { AppHeader, CLASS_NAME } from "./AppHeader";
 import { Modal } from "./Modal";
 import { getStore } from "@/lib/store";
 import { usePolling } from "@/lib/usePolling";
-import { VIEWS, viewLabel, type Board, type ViewKey } from "@/lib/types";
+import { KINDS, VIEWS, viewLabel, type Board, type PostKind, type RevealMode, type ViewKey } from "@/lib/types";
 
 // 첫 화면: 주제별로 독립된 게시판 카드
 export function BoardList() {
@@ -29,7 +29,7 @@ export function BoardList() {
 
   return (
     <>
-      <AppHeader subTitle={`${CLASS_NAME} · 과학`} title="우리 반 게시판" />
+      <AppHeader subTitle={`${CLASS_NAME} · 정보 · 인공지능 · 데이터 과학`} title="우리 반 게시판" />
       <main className="mx-auto box-border flex w-full max-w-[1240px] flex-col gap-4 px-4 pb-10 pt-7 sm:px-6">
         <p className="text-[15px] text-ink-soft">
           게시판마다 글·댓글·좋아요가 따로 관리돼요. 들어가서 원하는 보기로 바꿔 볼 수 있어요.
@@ -87,11 +87,13 @@ export function BoardList() {
 function NewBoardModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { userId } = useAuth();
   const [title, setTitle] = useState("");
-  const [subject, setSubject] = useState("과학 · ");
+  const [subject, setSubject] = useState("정보 · ");
   const [description, setDescription] = useState("");
   const [notice, setNotice] = useState("");
   const [sections, setSections] = useState("");
   const [view, setView] = useState<ViewKey>("wall");
+  const [kind, setKind] = useState<PostKind>("general");
+  const [reveal, setReveal] = useState<RevealMode>("open");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -112,6 +114,8 @@ function NewBoardModal({ onClose, onCreated }: { onClose: () => void; onCreated:
             .filter(Boolean)
             .slice(0, 8),
           default_view: view,
+          default_kind: kind,
+          reveal_mode: reveal,
         },
         userId,
       );
@@ -127,7 +131,7 @@ function NewBoardModal({ onClose, onCreated }: { onClose: () => void; onCreated:
       <form onSubmit={submit} className="flex flex-col gap-3 text-sm">
         <label className="flex flex-col gap-1">
           게시판 이름
-          <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} placeholder="예: 봄 식물 찾기" autoFocus />
+          <input className="field" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={100} placeholder="예: 파이썬 코드 나눔" autoFocus />
         </label>
         <label className="flex flex-col gap-1">
           과목 · 활동
@@ -160,6 +164,24 @@ function NewBoardModal({ onClose, onCreated }: { onClose: () => void; onCreated:
             ))}
           </div>
         </fieldset>
+        <label className="flex flex-col gap-1">
+          기본 글 종류
+          <select className="field" value={kind} onChange={(e) => setKind(e.target.value as PostKind)}>
+            {KINDS.map((k) => (
+              <option key={k.key} value={k.key}>
+                {k.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          친구 글 공개 (과제 게시판은 베끼기 방지로 &apos;제출하면&apos; 추천)
+          <select className="field" value={reveal} onChange={(e) => setReveal(e.target.value as RevealMode)}>
+            <option value="open">항상 공개</option>
+            <option value="after_submit">내 글을 올리면 공개</option>
+            <option value="teacher">교사가 공개할 때까지 비공개</option>
+          </select>
+        </label>
         {error && <p className="rounded-lg bg-red-50 p-2 text-red-700">{error}</p>}
         <button disabled={saving || !title.trim()} className="write-btn mt-1 self-end">
           {saving ? "만드는 중…" : "만들기"}

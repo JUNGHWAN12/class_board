@@ -13,6 +13,24 @@ export function viewLabel(key: ViewKey) {
   return VIEWS.find((v) => v.key === key)?.label ?? "";
 }
 
+// 글 종류 (계획서 2-2)
+export type PostKind = "general" | "question" | "code" | "assignment";
+
+export const KINDS: { key: PostKind; label: string }[] = [
+  { key: "general", label: "일반" },
+  { key: "question", label: "질문" },
+  { key: "code", label: "코드 공유" },
+  { key: "assignment", label: "과제 제출" },
+];
+
+export function kindLabel(key: PostKind) {
+  return KINDS.find((k) => k.key === key)?.label ?? "";
+}
+
+// 다른 학생 글을 언제 보여줄지 (계획서 2-3 제출 후 공개)
+//  open: 항상 / after_submit: 내 글을 올리면 / teacher: 교사가 공개 버튼을 누르면
+export type RevealMode = "open" | "after_submit" | "teacher";
+
 export type Board = {
   id: string;
   title: string;
@@ -22,6 +40,9 @@ export type Board = {
   sections: string[]; // 칸별 보기의 칸 이름 (예: 1모둠, 2모둠)
   default_view: ViewKey;
   allow_photos: boolean;
+  default_kind: PostKind;
+  reveal_mode: RevealMode;
+  revealed: boolean; // reveal_mode=teacher 일 때 교사가 공개했는지
   owner_id: string;
   is_locked: boolean;
   post_count: number; // 학생에게 보이는 글 수
@@ -29,8 +50,13 @@ export type Board = {
   updated_at: string;
 };
 
-export type BoardInput = Pick<Board, "title" | "description" | "subject" | "notice" | "sections" | "default_view">;
-export type BoardChanges = Partial<Pick<Board, "is_locked" | "allow_photos" | "default_view" | "notice">>;
+export type BoardInput = Pick<
+  Board,
+  "title" | "description" | "subject" | "notice" | "sections" | "default_view" | "default_kind" | "reveal_mode"
+>;
+export type BoardChanges = Partial<
+  Pick<Board, "is_locked" | "allow_photos" | "default_view" | "notice" | "reveal_mode" | "revealed">
+>;
 
 export type Post = {
   id: string;
@@ -38,10 +64,12 @@ export type Post = {
   author_id: string;
   author_name: string;
   author_avatar: string | null;
+  kind: PostKind;
   title: string;
   content: string;
   section: string;
   image_path: string | null;
+  solved_comment_id: string | null; // 질문에서 채택한 댓글 (있으면 해결됨)
   is_hidden: boolean;
   removed: boolean;
   like_count: number;
@@ -50,8 +78,23 @@ export type Post = {
   updated_at: string;
 };
 
-export type PostInput = { board_id: string; title: string; content: string; section: string; image: File | null };
-export type PostChanges = Partial<{ content: string; is_hidden: boolean; deleted_at: string }>;
+export type PostInput = {
+  board_id: string;
+  kind: PostKind;
+  title: string;
+  content: string;
+  section: string;
+  image: File | null;
+};
+export type PostChanges = Partial<{
+  content: string;
+  is_hidden: boolean;
+  deleted_at: string;
+  solved_comment_id: string | null;
+}>;
+
+// 글 내용 최대 길이 (긴 코드를 위해 20,000자)
+export const MAX_CONTENT = 20000;
 
 export type Comment = {
   id: string;
@@ -70,6 +113,8 @@ export type CommentChanges = Partial<{ is_hidden: boolean; deleted_at: string }>
 
 export type ExportRow = {
   kind: string;
+  post_kind: PostKind | null;
+  solved: boolean | null;
   post_id: string;
   author_name: string;
   author_email: string;

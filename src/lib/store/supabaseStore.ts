@@ -56,6 +56,7 @@ export const supabaseStore: BoardStore = {
     const { error } = await supabase.from("posts").insert({
       board_id: input.board_id,
       author_id: userId,
+      kind: input.kind,
       title: input.title,
       content: input.content,
       section: input.section,

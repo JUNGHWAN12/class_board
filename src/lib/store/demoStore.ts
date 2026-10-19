@@ -48,6 +48,20 @@ function withCount(db: DemoDb, b: DemoDb["boards"][number]): Board {
   return { ...b, post_count };
 }
 
+type Me = ReturnType<typeof getDemoUser>;
+
+// 이 글을 지금 사용자가 볼 수 있는지 (DB 의 get_board_posts 와 같은 규칙)
+function canSee(db: DemoDb, me: Me, p: DemoDb["posts"][number]) {
+  if (p.deleted_at) return false;
+  if (me.isTeacher || p.author_id === me.id) return true;
+  if (p.is_hidden) return false;
+  const b = db.boards.find((b) => b.id === p.board_id);
+  if (!b || b.reveal_mode === "open") return true;
+  if (b.reveal_mode === "teacher") return b.revealed;
+  // after_submit: 내가 이 게시판에 글을 올렸으면 공개
+  return db.posts.some((x) => x.board_id === b.id && x.author_id === me.id && !x.deleted_at);
+}
+
 function requireBoard(db: DemoDb, id: string) {
   const b = db.boards.find((b) => b.id === id);
   if (!b) throw new Error("게시판을 찾을 수 없습니다");
@@ -96,6 +110,7 @@ export const demoStore: BoardStore = {
       ...input,
       id: crypto.randomUUID(),
       allow_photos: true,
+      revealed: false,
       owner_id: userId,
       is_locked: false,
       created_at: t,
@@ -121,17 +136,19 @@ export const demoStore: BoardStore = {
       .filter((p) => p.board_id === boardId)
       .filter((p) => (since ? p.updated_at > since : !p.deleted_at))
       .map((p): Post => {
-        const visible = !p.deleted_at && (!p.is_hidden || me.isTeacher || p.author_id === me.id);
+        const visible = canSee(db, me, p);
         return {
           id: p.id,
           board_id: p.board_id,
           author_id: p.author_id,
           author_name: userName(p.author_id),
           author_avatar: null,
+          kind: p.kind,
           title: visible ? p.title : "",
           content: visible ? p.content : "",
           section: p.section,
           image_path: visible ? p.image_path : null,
+          solved_comment_id: p.solved_comment_id,
           is_hidden: p.is_hidden,
           removed: !visible,
           like_count: p.like_count,
@@ -159,10 +176,12 @@ export const demoStore: BoardStore = {
       id: crypto.randomUUID(),
       board_id: input.board_id,
       author_id: userId,
+      kind: input.kind,
       title: input.title,
       content: input.content,
       section: input.section,
       image_path,
+      solved_comment_id: null,
       is_hidden: false,
       deleted_at: null,
       like_count: 0,
@@ -182,6 +201,9 @@ export const demoStore: BoardStore = {
       if (p.author_id !== me.id) throw new Error("내 글만 바꿀 수 있습니다");
       if (changes.is_hidden !== undefined) throw new Error("교사만 글을 숨길 수 있습니다");
       if (requireBoard(db, p.board_id).is_locked) throw new Error("잠긴 게시판입니다");
+    }
+    if (changes.solved_comment_id && !db.comments.some((c) => c.id === changes.solved_comment_id && c.post_id === p.id)) {
+      throw new Error("이 글의 댓글만 채택할 수 있습니다");
     }
     Object.assign(p, changes, { updated_at: now() });
     save(db);
@@ -208,6 +230,8 @@ export const demoStore: BoardStore = {
   async getComments(postId, since) {
     const db = load();
     const me = getDemoUser();
+    const post = db.posts.find((p) => p.id === postId);
+    if (!post || !canSee(db, me, post)) return [];
     return db.comments
       .filter((c) => c.post_id === postId)
       .filter((c) => (since ? c.updated_at > since : !c.deleted_at))
@@ -232,7 +256,7 @@ export const demoStore: BoardStore = {
     const db = load();
     const me = getDemoUser();
     const p = db.posts.find((p) => p.id === postId);
-    if (!p) throw new Error("글을 찾을 수 없습니다");
+    if (!p || !canSee(db, me, p)) throw new Error("글을 찾을 수 없습니다");
     if (requireBoard(db, p.board_id).is_locked && !me.isTeacher) throw new Error("잠긴 게시판입니다");
     const t = now();
     db.comments.push({
@@ -271,6 +295,8 @@ export const demoStore: BoardStore = {
     for (const p of [...posts].sort((a, b) => a.created_at.localeCompare(b.created_at))) {
       rows.push({
         kind: "글",
+        post_kind: p.kind,
+        solved: p.kind === "question" ? Boolean(p.solved_comment_id) : null,
         post_id: p.id,
         author_name: userName(p.author_id),
         author_email: userEmail(p.author_id),
@@ -284,6 +310,8 @@ export const demoStore: BoardStore = {
       for (const c of db.comments.filter((c) => c.post_id === p.id && !c.deleted_at)) {
         rows.push({
           kind: "댓글",
+          post_kind: null,
+          solved: null,
           post_id: p.id,
           author_name: userName(c.author_id),
           author_email: userEmail(c.author_id),

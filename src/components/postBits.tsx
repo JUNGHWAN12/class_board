@@ -1,6 +1,7 @@
 "use client";
 
 import { initialOf } from "./AppHeader";
+import { plainText } from "./RichText";
 import type { Board, Post, PostChanges } from "@/lib/types";
 
 // 다섯 가지 보기가 함께 쓰는 작은 조각들
@@ -69,6 +70,24 @@ export function LikeButton({ post, liked, onLike, small }: { post: Post; liked: 
   );
 }
 
+// 글 종류 배지: 질문은 해결됨/미해결까지 보여줍니다. 일반 글은 배지 없음.
+export function KindBadge({ post }: { post: Post }) {
+  if (post.kind === "question") {
+    return post.solved_comment_id ? (
+      <span className="inline-block rounded-md bg-school px-1.5 py-0.5 text-[11px] text-white">✓ 해결됨</span>
+    ) : (
+      <span className="inline-block rounded-md bg-[#D9534F] px-1.5 py-0.5 text-[11px] text-white">질문</span>
+    );
+  }
+  if (post.kind === "code") {
+    return <span className="inline-block rounded-md bg-ink px-1.5 py-0.5 font-mono text-[11px] text-white">&lt;/&gt; 코드</span>;
+  }
+  if (post.kind === "assignment") {
+    return <span className="inline-block rounded-md bg-sun px-1.5 py-0.5 text-[11px] text-ink">과제</span>;
+  }
+  return null;
+}
+
 export function HiddenBadge() {
   return (
     <span className="inline-block rounded-md bg-ink px-2 py-0.5 text-xs text-white">숨김 · 학생에게 안 보임</span>
@@ -114,6 +133,6 @@ export function EmptyState({ locked }: { locked: boolean }) {
 // 제목이 없는 글(대화 보기에서 쓴 글 등)은 내용 앞부분을 제목처럼 씁니다.
 export function displayTitle(post: Post, max = 40) {
   if (post.title) return post.title;
-  const one = post.content.replace(/\s+/g, " ").trim();
+  const one = plainText(post.content).replace(/\s+/g, " ").trim() || "(코드)";
   return one.length > max ? one.slice(0, max) + "…" : one;
 }

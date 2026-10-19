@@ -3,10 +3,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { Modal } from "./Modal";
-import { Avatar, HiddenBadge, LikeButton, PostPhoto, timeAgo } from "./postBits";
+import { RichText } from "./RichText";
+import { Avatar, HiddenBadge, KindBadge, LikeButton, PostPhoto, timeAgo } from "./postBits";
 import { getStore } from "@/lib/store";
 import { usePolling } from "@/lib/usePolling";
-import type { Comment, CommentChanges, Post, PostChanges } from "@/lib/types";
+import { MAX_CONTENT, type Comment, type CommentChanges, type Post, type PostChanges } from "@/lib/types";
 
 type Props = {
   post: Post;
@@ -85,6 +86,8 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
 
   const canEdit = post.author_id === userId && (!locked || isTeacher);
   const canComment = !locked || isTeacher;
+  // 질문한 학생이나 교사가 도움이 된 댓글을 채택하면 '해결됨' (계획서 2-2)
+  const canAdopt = post.kind === "question" && (post.author_id === userId || isTeacher) && (!locked || isTeacher);
 
   return (
     <Modal
@@ -104,13 +107,25 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
       }
       footer={
         canComment ? (
-          <form onSubmit={add} className="flex gap-2 p-3">
-            <input
+          <form onSubmit={add} className="flex items-end gap-2 p-3">
+            <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              maxLength={1000}
-              placeholder="댓글 달기"
-              className="field flex-1"
+              onKeyDown={(e) => {
+                // Enter 는 줄바꿈 (코드 답글), Ctrl/⌘+Enter 로 등록
+                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) add(e);
+                if (e.key === "Tab" && !e.shiftKey) {
+                  e.preventDefault();
+                  const el = e.currentTarget;
+                  const { selectionStart: a, selectionEnd: b } = el;
+                  setText(text.slice(0, a) + "    " + text.slice(b));
+                  requestAnimationFrame(() => el.setSelectionRange(a + 4, a + 4));
+                }
+              }}
+              maxLength={5000}
+              rows={text.includes("\n") ? 4 : 1}
+              placeholder="댓글 달기 (``` 로 감싸면 코드)"
+              className="field flex-1 resize-y"
             />
             <button disabled={saving || !text.trim()} className="rounded-xl bg-school px-4 py-2 text-white disabled:opacity-50">
               등록
@@ -121,15 +136,21 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
         )
       }
     >
-      {post.is_hidden && (
-        <div className="mb-2">
-          <HiddenBadge />
-        </div>
-      )}
+      <div className="mb-2 flex flex-wrap gap-1.5 empty:hidden">
+        <KindBadge post={post} />
+        {post.is_hidden && <HiddenBadge />}
+      </div>
       {post.title && <h2 className="mb-2 font-display text-2xl">{post.title}</h2>}
       {editing ? (
         <div>
-          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={5000} rows={5} className="field" />
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            maxLength={MAX_CONTENT}
+            rows={8}
+            spellCheck={false}
+            className="field font-mono text-[13px]"
+          />
           <div className="mt-1 flex justify-end gap-2 text-sm">
             <button type="button" onClick={() => setEditing(false)} className="px-2 py-1 text-muted">
               취소
@@ -148,7 +169,7 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
           </div>
         </div>
       ) : (
-        <p className="whitespace-pre-wrap break-words leading-relaxed">{post.content}</p>
+        <RichText text={post.content} className="leading-relaxed" />
       )}
       <PostPhoto src={store.imageUrl(post.image_path)} className="mt-3 rounded-lg" />
 
@@ -193,14 +214,28 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
         {sorted.map((c) => (
           <li key={c.id} className={`flex gap-2 ${c.is_hidden ? "opacity-60" : ""}`}>
             <Avatar name={c.author_name} url={c.author_avatar} size={32} />
-            <div className="min-w-0 flex-1 rounded-xl bg-paper px-3 py-2">
+            <div
+              className={`min-w-0 flex-1 rounded-xl px-3 py-2 ${
+                post.solved_comment_id === c.id ? "border-2 border-school bg-leaf" : "bg-paper"
+              }`}
+            >
+              {post.solved_comment_id === c.id && <p className="mb-0.5 text-xs font-bold text-school">✓ 채택된 답변</p>}
               <p className="text-xs">
                 <span className="font-semibold">{c.author_name}</span>{" "}
                 <span className="text-muted">{timeAgo(c.created_at)}</span>
                 {c.is_hidden && <span className="ml-1 text-cream-ink">(숨김)</span>}
               </p>
-              <p className="whitespace-pre-wrap break-words text-sm">{c.content}</p>
+              <RichText text={c.content} className="text-sm" />
               <div className="mt-1 flex gap-2 text-xs text-muted">
+                {canAdopt && c.author_id !== post.author_id && (
+                  <button
+                    type="button"
+                    className="font-semibold text-school"
+                    onClick={() => onUpdate({ solved_comment_id: post.solved_comment_id === c.id ? null : c.id })}
+                  >
+                    {post.solved_comment_id === c.id ? "채택 취소" : "✓ 채택"}
+                  </button>
+                )}
                 {isTeacher && (
                   <button type="button" onClick={() => updateComment(c, { is_hidden: !c.is_hidden })}>
                     {c.is_hidden ? "보이기" : "숨기기"}

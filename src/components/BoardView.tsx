@@ -10,7 +10,7 @@ import { PostModal } from "./PostModal";
 import type { ViewProps } from "./postBits";
 import { getStore } from "@/lib/store";
 import { usePolling } from "@/lib/usePolling";
-import { VIEWS, type Board, type ExportRow, type Post, type PostChanges, type PostInput, type ViewKey } from "@/lib/types";
+import { kindLabel, VIEWS, type RevealMode, type Board, type ExportRow, type Post, type PostChanges, type PostInput, type ViewKey } from "@/lib/types";
 
 // 새 글 확인 간격. 무료 요금제에 맞춰 실시간 연결 대신 짧은 간격으로 확인합니다.
 const POLL_MS = 5000;
@@ -18,6 +18,16 @@ const POLL_MS = 5000;
 const BOARD_POLL_MS = 15000;
 // 저장 순서와 시간 차이로 글을 놓치지 않도록 조금 겹쳐서 가져옵니다.
 const OVERLAP_MS = 10000;
+
+// 글 종류 거르기 (계획서 2-2: 종류별 필터, 미해결 질문만 모아보기)
+type PostFilter = "all" | "question" | "unsolved" | "code" | "assignment";
+const FILTERS: Record<PostFilter, { label: string; test: (p: Post) => boolean }> = {
+  all: { label: "전체", test: () => true },
+  question: { label: "질문", test: (p) => p.kind === "question" },
+  unsolved: { label: "미해결 질문", test: (p) => p.kind === "question" && !p.solved_comment_id },
+  code: { label: "코드 공유", test: (p) => p.kind === "code" },
+  assignment: { label: "과제 제출", test: (p) => p.kind === "assignment" },
+};
 
 const VIEW_COMPONENTS: Record<ViewKey, (p: ViewProps) => React.ReactNode> = {
   wall: WallView,
@@ -113,18 +123,42 @@ function BoardScreen({ boardId }: { boardId: string }) {
   usePolling(loadPosts, POLL_MS);
   usePolling(loadBoard, BOARD_POLL_MS);
 
-  const sorted = useMemo(
+  // 처음부터 다시 불러오기: 보이는 범위가 바뀌었을 때 (제출 후 공개, 교사 공개 버튼)
+  // 바뀐 글만 가져오는 방식으로는 원래 있던 다른 학생 글이 오지 않기 때문입니다.
+  const reloadAll = useCallback(() => {
+    sinceRef.current = null;
+    setPosts(new Map());
+    loadPosts();
+  }, [loadPosts]);
+
+  const visKey = board ? `${board.reveal_mode}:${board.revealed}` : "";
+  const prevVisKey = useRef(visKey);
+  useEffect(() => {
+    if (prevVisKey.current && prevVisKey.current !== visKey) reloadAll();
+    prevVisKey.current = visKey;
+  }, [visKey, reloadAll]);
+
+  const [filter, setFilter] = useState<PostFilter>("all");
+  const allPosts = useMemo(
     () => [...posts.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)),
     [posts],
   );
+  const sorted = useMemo(() => allPosts.filter(FILTERS[filter].test), [allPosts, filter]);
 
   // 참여 현황: 글을 쓴 학생 수 (교사 본인 제외)
   const participants = useMemo(() => {
-    const ids = new Set(sorted.map((p) => p.author_id));
+    const ids = new Set(allPosts.map((p) => p.author_id));
     if (board) ids.delete(board.owner_id);
     if (isTeacher && userId) ids.delete(userId);
     return ids.size;
-  }, [sorted, board, isTeacher, userId]);
+  }, [allPosts, board, isTeacher, userId]);
+
+  // 제출 후 공개 게시판에서 학생에게 다른 친구 글이 가려져 있는지
+  const iPosted = allPosts.some((p) => p.author_id === userId);
+  const othersHidden =
+    !!board &&
+    !isTeacher &&
+    ((board.reveal_mode === "after_submit" && !iPosted) || (board.reveal_mode === "teacher" && !board.revealed));
 
   const toggleLike = async (post: Post) => {
     if (!userId) return;
@@ -158,7 +192,8 @@ function BoardScreen({ boardId }: { boardId: string }) {
     if (!userId) return false;
     try {
       await store.createPost(input, userId);
-      loadPosts();
+      if (board && board.reveal_mode !== "open") reloadAll();
+      else loadPosts();
       return true;
     } catch (e) {
       showError(e);
@@ -244,9 +279,30 @@ function BoardScreen({ boardId }: { boardId: string }) {
           <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5 text-sm text-cream-ink sm:px-6">
             <b className="font-display text-lg font-normal">이 게시판 관리</b>
             <span>
-              참여 {participants}
+              {board.default_kind === "assignment" ? "제출" : "참여"} {participants}
               {store.rosterSize ? ` / ${store.rosterSize}` : ""}명
             </span>
+            <label className="flex items-center gap-1.5">
+              친구 글 공개:
+              <select
+                value={board.reveal_mode}
+                onChange={(e) => changeBoard({ reveal_mode: e.target.value as RevealMode })}
+                className="h-9 rounded-lg border border-cream-line bg-white px-2"
+              >
+                <option value="open">항상</option>
+                <option value="after_submit">제출하면</option>
+                <option value="teacher">교사가 공개할 때</option>
+              </select>
+            </label>
+            {board.reveal_mode === "teacher" && (
+              <button
+                type="button"
+                onClick={() => changeBoard({ revealed: !board.revealed })}
+                className="h-10 rounded-[10px] bg-school px-3.5 text-white hover:bg-school-dark"
+              >
+                {board.revealed ? "다시 비공개" : "지금 공개하기"}
+              </button>
+            )}
             <label className="flex min-h-10 cursor-pointer items-center gap-1.5">
               <input
                 type="checkbox"
@@ -321,6 +377,35 @@ function BoardScreen({ boardId }: { boardId: string }) {
       )}
 
       <main className="mx-auto box-border w-full max-w-[1240px] px-4 pb-24 pt-5 sm:px-6 sm:pb-8">
+        {othersHidden && board && (
+          <div className="mb-4 rounded-[10px] border border-cream-line bg-cream px-4 py-3 text-sm text-cream-ink">
+            {board.reveal_mode === "after_submit"
+              ? "🔒 내 글을 먼저 올리면 친구들 글을 볼 수 있어요. (베끼기 방지)"
+              : "🔒 선생님이 공개하면 친구들 글을 볼 수 있어요. 지금은 내 글만 보여요."}
+          </div>
+        )}
+        {loaded && board && allPosts.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-1.5" role="radiogroup" aria-label="글 종류로 거르기">
+            {(Object.keys(FILTERS) as PostFilter[]).map((key) => {
+              const n = allPosts.filter(FILTERS[key].test).length;
+              if (key !== "all" && n === 0 && filter !== key) return null;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={filter === key}
+                  onClick={() => setFilter(key)}
+                  className={`min-h-8 rounded-full border px-3 text-[13px] ${
+                    filter === key ? "border-school bg-school text-white" : "border-line bg-white text-ink-soft"
+                  }`}
+                >
+                  {FILTERS[key].label} {n}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {!loaded || !board ? (
           <p className="py-16 text-center text-muted">불러오는 중…</p>
         ) : (
@@ -336,7 +421,14 @@ function BoardScreen({ boardId }: { boardId: string }) {
             onLike={toggleLike}
             onUpdate={updatePost}
             onQuickPost={(content) =>
-              createPost({ board_id: board.id, title: "", content, section: board.sections[0] ?? "", image: null })
+              createPost({
+                board_id: board.id,
+                kind: board.default_kind,
+                title: "",
+                content,
+                section: board.sections[0] ?? "",
+                image: null,
+              })
             }
           />
         )}
@@ -363,13 +455,15 @@ function BoardScreen({ boardId }: { boardId: string }) {
 }
 
 function downloadCsv(rows: ExportRow[], title: string) {
-  const header = ["구분", "글번호", "칸", "이름", "이메일", "제목", "내용", "좋아요", "숨김", "작성시각"];
+  const header = ["구분", "글번호", "글 종류", "해결", "칸", "이름", "이메일", "제목", "내용", "좋아요", "숨김", "작성시각"];
   const ids = new Map<string, number>();
   const lines = rows.map((r) => {
     if (!ids.has(r.post_id)) ids.set(r.post_id, ids.size + 1);
     return [
       r.kind,
       ids.get(r.post_id),
+      r.post_kind ? kindLabel(r.post_kind) : "",
+      r.post_kind === "question" ? (r.solved ? "해결됨" : "미해결") : "",
       r.section,
       r.author_name,
       r.author_email,
