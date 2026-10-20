@@ -165,16 +165,22 @@ function BoardScreen({ boardId }: { boardId: string }) {
   );
   const sorted = useMemo(() => allPosts.filter(FILTERS[filter].test), [allPosts, filter]);
 
+  // 과제 게시판은 '과제 제출' 글만 제출로 셉니다 (대화 보기 한 줄 글 등은 제외).
+  const countsAsSubmit = useCallback(
+    (p: Post) => board?.default_kind !== "assignment" || p.kind === "assignment",
+    [board?.default_kind],
+  );
+
   // 참여 현황: 글을 쓴 학생 수 (교사 본인 제외)
   const participants = useMemo(() => {
-    const ids = new Set(allPosts.map((p) => p.author_id));
+    const ids = new Set(allPosts.filter(countsAsSubmit).map((p) => p.author_id));
     if (board) ids.delete(board.owner_id);
     if (isTeacher && userId) ids.delete(userId);
     return ids.size;
-  }, [allPosts, board, isTeacher, userId]);
+  }, [allPosts, countsAsSubmit, board, isTeacher, userId]);
 
-  // 제출 후 공개 게시판에서 학생에게 다른 친구 글이 가려져 있는지
-  const iPosted = allPosts.some((p) => p.author_id === userId);
+  // 제출 후 공개 게시판에서 학생에게 다른 친구 글이 가려져 있는지 (DB 의 board_revealed_for_me 와 같은 규칙)
+  const iPosted = allPosts.some((p) => p.author_id === userId && countsAsSubmit(p));
   const othersHidden =
     !!board &&
     !isTeacher &&
@@ -199,13 +205,17 @@ function BoardScreen({ boardId }: { boardId: string }) {
     loadPosts();
   };
 
+  // 성공하면 true (실패하면 오류를 띄우고 false — 수정 창은 열어 둡니다)
   const updatePost = async (post: Post, changes: PostChanges) => {
+    let ok = true;
     try {
       await store.updatePost(post, changes);
     } catch (e) {
       showError(e);
+      ok = false;
     }
     loadPosts();
+    return ok;
   };
 
   const createPost = async (input: PostInput) => {
@@ -400,7 +410,9 @@ function BoardScreen({ boardId }: { boardId: string }) {
         {othersHidden && board && (
           <div className="mb-4 rounded-[10px] border border-cream-line bg-cream px-4 py-3 text-sm text-cream-ink">
             {board.reveal_mode === "after_submit"
-              ? "🔒 내 글을 먼저 올리면 친구들 글을 볼 수 있어요. (베끼기 방지)"
+              ? board.default_kind === "assignment"
+                ? "🔒 '+ 글쓰기'로 과제 제출 글을 올리면 친구들 글을 볼 수 있어요. 대화 글은 제출로 세지 않아요. (베끼기 방지)"
+                : "🔒 내 글을 먼저 올리면 친구들 글을 볼 수 있어요. (베끼기 방지)"
               : "🔒 선생님이 공개하면 친구들 글을 볼 수 있어요. 지금은 내 글만 보여요."}
           </div>
         )}
@@ -443,7 +455,8 @@ function BoardScreen({ boardId }: { boardId: string }) {
             onQuickPost={(content) =>
               createPost({
                 board_id: board.id,
-                kind: board.default_kind,
+                // 한 줄 대화는 과제 제출로 세지 않도록 항상 일반 글
+                kind: "general",
                 title: "",
                 content,
                 section: board.sections[0] ?? "",
@@ -484,7 +497,7 @@ function BoardScreen({ boardId }: { boardId: string }) {
 }
 
 function downloadCsv(rows: ExportRow[], title: string) {
-  const header = ["구분", "글번호", "글 종류", "해결", "칸", "이름", "이메일", "제목", "내용", "좋아요", "숨김", "작성시각"];
+  const header = ["구분", "글번호", "글 종류", "해결", "칸", "이름", "이메일", "제목", "내용", "좋아요", "숨김", "작성시각", "수정시각"];
   const ids = new Map<string, number>();
   const lines = rows.map((r) => {
     if (!ids.has(r.post_id)) ids.set(r.post_id, ids.size + 1);
@@ -501,10 +514,11 @@ function downloadCsv(rows: ExportRow[], title: string) {
       r.like_count ?? "",
       r.is_hidden ? "숨김" : "",
       new Date(r.created_at).toLocaleString("ko-KR"),
+      r.edited_at ? new Date(r.edited_at).toLocaleString("ko-KR") : "",
     ];
   });
   const csv = [header, ...lines]
-    .map((row) => row.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(","))
+    .map((row) => row.map((v) => `"${csvSafe(String(v ?? "")).replace(/"/g, '""')}"`).join(","))
     .join("\r\n");
   // 엑셀에서 한글이 깨지지 않도록 BOM 을 붙입니다.
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
@@ -513,5 +527,10 @@ function downloadCsv(rows: ExportRow[], title: string) {
   a.download = `${title}.csv`;
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+// 학생 글이 =, +, -, @ 등으로 시작하면 엑셀이 수식으로 실행하므로 앞에 ' 를 붙여 글자로 둡니다.
+function csvSafe(v: string) {
+  return /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
 }
 

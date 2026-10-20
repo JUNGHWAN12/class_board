@@ -75,7 +75,8 @@ export type Post = {
   like_count: number;
   comment_count: number;
   created_at: string;
-  updated_at: string;
+  updated_at: string; // 좋아요·댓글로도 바뀜 (새 글 확인용)
+  edited_at: string | null; // 작성자가 내용·제목을 고친 시각
 };
 
 export type PostInput = {
@@ -124,4 +125,5 @@ export type ExportRow = {
   like_count: number | null;
   is_hidden: boolean;
   created_at: string;
+  edited_at: string | null;
 };

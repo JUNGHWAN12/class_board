@@ -84,6 +84,8 @@ export function PostComposer({ board, canAttach, onClose, onSubmit, initial }: P
   const isQuestion = kind === "question";
   const finalContent = isQuestion ? buildQuestion({ ask, lang, code, error, tried }) : content.trim();
   const tooLong = finalContent.length > MAX_CONTENT;
+  // 질문 양식은 다른 종류로 바꿔도 칸에 남아 있으므로 함께 봅니다.
+  const dirty = Boolean(title.trim() || content.trim() || ask.trim() || code.trim() || error.trim() || tried.trim() || file);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +104,7 @@ export function PostComposer({ board, canAttach, onClose, onSubmit, initial }: P
   };
 
   return (
-    <Modal wide title={<b className="font-display text-xl font-normal">{board.title}에 글쓰기</b>} onClose={onClose}>
+    <Modal wide dirty={dirty} title={<b className="font-display text-xl font-normal">{board.title}에 글쓰기</b>} onClose={onClose}>
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div className="flex flex-wrap gap-1 rounded-xl bg-tab p-1" role="radiogroup" aria-label="글 종류">
           {KINDS.map((k) => (

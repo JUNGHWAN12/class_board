@@ -15,7 +15,7 @@ type Props = {
   locked: boolean;
   onClose: () => void;
   onLike: () => void;
-  onUpdate: (changes: PostChanges) => Promise<void>;
+  onUpdate: (changes: PostChanges) => Promise<boolean>; // 성공하면 true
   onChanged: () => void;
   onError: (msg: string) => void;
 };
@@ -89,9 +89,13 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
   // 질문한 학생이나 교사가 도움이 된 댓글을 채택하면 '해결됨' (계획서 2-2)
   const canAdopt = post.kind === "question" && (post.author_id === userId || isTeacher) && (!locked || isTeacher);
 
+  // 쓰던 댓글이나 고치던 내용이 있으면 닫기 전에 묻습니다.
+  const dirty = Boolean(text.trim()) || (editing && draft.trim() !== post.content);
+
   return (
     <Modal
       wide
+      dirty={dirty}
       onClose={onClose}
       title={
         <div className="flex items-center gap-2">
@@ -101,6 +105,9 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
             <p className="text-xs text-muted">
               {timeAgo(post.created_at)}
               {post.section && ` · ${post.section}`}
+              {post.edited_at && (
+                <span title={new Date(post.edited_at).toLocaleString("ko-KR")}> · 수정됨 {timeAgo(post.edited_at)}</span>
+              )}
             </p>
           </div>
         </div>
@@ -159,8 +166,8 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
               type="button"
               disabled={!draft.trim()}
               onClick={async () => {
-                await onUpdate({ content: draft.trim() });
-                setEditing(false);
+                // 저장에 실패하면 고친 내용이 사라지지 않게 수정 창을 열어 둡니다.
+                if (await onUpdate({ content: draft.trim() })) setEditing(false);
               }}
               className="rounded-lg bg-school px-3 py-1 text-white disabled:opacity-50"
             >
@@ -199,8 +206,7 @@ export function PostModal({ post, liked, locked, onClose, onLike, onUpdate, onCh
             type="button"
             onClick={async () => {
               if (!confirm("이 글을 삭제할까요?")) return;
-              await onUpdate({ deleted_at: new Date().toISOString() });
-              onClose();
+              if (await onUpdate({ deleted_at: new Date().toISOString() })) onClose();
             }}
             className="rounded-lg px-2 py-1 text-xs text-danger hover:bg-red-50"
           >

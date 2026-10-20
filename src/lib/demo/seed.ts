@@ -201,6 +201,7 @@ export function createSeed(): DemoDb {
         comment_count: p.comments,
         created_at: iso(minutesAgo),
         updated_at: iso(minutesAgo),
+        edited_at: null,
       };
       db.posts.push(post);
 

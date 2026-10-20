@@ -15,6 +15,7 @@ import {
   timeAgo,
   type ViewProps,
 } from "./postBits";
+import type { Post } from "@/lib/types";
 
 // 담벼락: 색깔 포스트잇이 벽에 붙는 방식
 const TINTS = ["#FFF3B8", "#DDEFE6", "#E3EAF6", "#F8E1DA"];
@@ -25,6 +26,21 @@ function tintOf(id: string) {
   return TINTS[Math.abs(h) % TINTS.length];
 }
 
+// 카드 전체를 눌러 글 보기. 키보드로도 Tab 으로 가서 Enter·Space 로 열 수 있게 합니다.
+// (카드 안의 좋아요·복사 버튼에서 누른 키는 그 버튼이 처리)
+function openable(post: Post, onOpen: (id: string) => void) {
+  return {
+    tabIndex: 0,
+    "aria-label": `${displayTitle(post)} — ${post.author_name} 글 열기`,
+    onClick: () => onOpen(post.id),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      onOpen(post.id);
+    },
+  };
+}
+
 export function WallView(p: ViewProps) {
   if (p.posts.length === 0) return <EmptyState locked={p.locked} />;
   return (
@@ -32,7 +48,7 @@ export function WallView(p: ViewProps) {
       {p.posts.map((post) => (
         <article
           key={post.id}
-          onClick={() => p.onOpen(post.id)}
+          {...openable(post, p.onOpen)}
           className={`mb-[18px] cursor-pointer break-inside-avoid rounded p-3.5 shadow-[0_2px_6px_rgba(28,43,39,0.14)] transition hover:shadow-[0_4px_12px_rgba(28,43,39,0.2)] ${
             post.is_hidden ? "border-2 border-dashed border-muted" : ""
           }`}
@@ -46,7 +62,7 @@ export function WallView(p: ViewProps) {
           <KindBadge post={post} />
           {post.title && <h2 className="mb-2 mt-1 font-display text-[21px] leading-tight">{post.title}</h2>}
           <PostPhoto src={p.imageUrl(post.image_path)} className="max-h-[260px] rounded-sm" />
-          <RichText text={post.content} foldLines={10} className="my-2 text-[15px] leading-normal" />
+          <RichText text={post.content} foldLines={10} compact className="my-2 text-[15px] leading-normal" />
           <div className="flex items-center justify-between text-[13px] text-ink-soft">
             <span>
               {post.author_name} · {timeAgo(post.created_at)}
@@ -136,7 +152,7 @@ export function FeedView(p: ViewProps) {
           <div className="flex flex-col gap-1.5 px-3.5 py-3">
             <div className="text-[15px] leading-relaxed">
               {post.title && <b className="block">{post.title}</b>}
-              <RichText text={post.content} foldLines={15} />
+              <RichText text={post.content} foldLines={15} compact />
             </div>
             <div className="-ml-2 flex items-center text-sm text-ink-soft">
               <LikeButton post={post} liked={p.myLikes.has(post.id)} onLike={() => p.onLike(post)} />
@@ -177,13 +193,20 @@ export function GroupView(p: ViewProps) {
             {g.posts.map((post) => (
               <article
                 key={post.id}
-                onClick={() => p.onOpen(post.id)}
+                {...openable(post, p.onOpen)}
                 className={`flex cursor-pointer flex-col gap-1.5 rounded-lg bg-white p-3 hover:shadow ${
                   post.is_hidden ? "border-2 border-dashed border-muted" : ""
                 }`}
               >
-                {post.is_hidden && <HiddenBadge />}
-                <KindBadge post={post} />
+                {/* 세로 flex 안에서 배지가 카드 폭만큼 늘어나지 않게 감쌉니다 */}
+                {post.is_hidden && (
+                  <div className="self-start">
+                    <HiddenBadge />
+                  </div>
+                )}
+                <div className="self-start empty:hidden">
+                  <KindBadge post={post} />
+                </div>
                 <PostPhoto src={p.imageUrl(post.image_path)} className="h-[90px] rounded-md" />
                 <b className="text-[15px]">{displayTitle(post)}</b>
                 <span className="flex items-center gap-1 text-[13px] text-ink-soft">
@@ -252,7 +275,7 @@ export function ChatView(p: ViewProps) {
                   } ${post.is_hidden ? "opacity-60" : ""}`}
                 >
                   {post.title && <b className="block">{post.title}</b>}
-                  <RichText text={post.content} dark={mine} foldLines={10} />
+                  <RichText text={post.content} dark={mine} foldLines={10} compact />
                 </div>
                 {post.image_path && (
                   <button type="button" onClick={() => p.onOpen(post.id)} className="w-[220px] overflow-hidden rounded-xl">
