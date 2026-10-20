@@ -58,8 +58,14 @@ function canSee(db: DemoDb, me: Me, p: DemoDb["posts"][number]) {
   const b = db.boards.find((b) => b.id === p.board_id);
   if (!b || b.reveal_mode === "open") return true;
   if (b.reveal_mode === "teacher") return b.revealed;
-  // after_submit: 내가 이 게시판에 글을 올렸으면 공개
-  return db.posts.some((x) => x.board_id === b.id && x.author_id === me.id && !x.deleted_at);
+  // after_submit: 내가 이 게시판에 글을 올렸으면 공개 (과제 게시판은 과제 제출 글만 셈)
+  return db.posts.some(
+    (x) =>
+      x.board_id === b.id &&
+      x.author_id === me.id &&
+      !x.deleted_at &&
+      (b.default_kind !== "assignment" || x.kind === "assignment"),
+  );
 }
 
 function requireBoard(db: DemoDb, id: string) {
@@ -155,6 +161,7 @@ export const demoStore: BoardStore = {
           comment_count: p.comment_count,
           created_at: p.created_at,
           updated_at: p.updated_at,
+          edited_at: visible ? (p.edited_at ?? null) : null,
         };
       })
       .sort((a, b) => a.updated_at.localeCompare(b.updated_at));
@@ -188,6 +195,7 @@ export const demoStore: BoardStore = {
       comment_count: 0,
       created_at: t,
       updated_at: t,
+      edited_at: null,
     });
     save(db);
   },
@@ -205,7 +213,9 @@ export const demoStore: BoardStore = {
     if (changes.solved_comment_id && !db.comments.some((c) => c.id === changes.solved_comment_id && c.post_id === p.id)) {
       throw new Error("이 글의 댓글만 채택할 수 있습니다");
     }
+    const edited = changes.content !== undefined && changes.content !== p.content;
     Object.assign(p, changes, { updated_at: now() });
+    if (edited) p.edited_at = p.updated_at;
     save(db);
   },
 
@@ -281,6 +291,8 @@ export const demoStore: BoardStore = {
     if (!me.isTeacher) {
       if (c.author_id !== me.id) throw new Error("내 댓글만 바꿀 수 있습니다");
       if (changes.is_hidden !== undefined) throw new Error("교사만 댓글을 숨길 수 있습니다");
+      const post = db.posts.find((p) => p.id === c.post_id);
+      if (post && requireBoard(db, post.board_id).is_locked) throw new Error("잠긴 게시판입니다");
     }
     Object.assign(c, changes, { updated_at: now() });
     recountComments(db, c.post_id);
@@ -306,6 +318,7 @@ export const demoStore: BoardStore = {
         like_count: p.like_count,
         is_hidden: p.is_hidden,
         created_at: p.created_at,
+        edited_at: p.edited_at ?? null,
       });
       for (const c of db.comments.filter((c) => c.post_id === p.id && !c.deleted_at)) {
         rows.push({
@@ -321,6 +334,7 @@ export const demoStore: BoardStore = {
           like_count: null,
           is_hidden: c.is_hidden,
           created_at: c.created_at,
+          edited_at: null,
         });
       }
     }

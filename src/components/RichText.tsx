@@ -41,9 +41,10 @@ type Props = {
   className?: string;
   dark?: boolean; // 초록 말풍선처럼 어두운 배경 위
   foldLines?: number; // 코드가 이 줄 수보다 길면 접어 두기 (담벼락 카드)
+  compact?: boolean; // 카드 안: draw_flow 버튼은 빼고 '복사'만 (글 보기 창에서 열 수 있음)
 };
 
-export function RichText({ text, className = "", dark, foldLines }: Props) {
+export function RichText({ text, className = "", dark, foldLines, compact }: Props) {
   const segments = parseSegments(text);
   return (
     <div className={`min-w-0 break-words ${className}`}>
@@ -58,8 +59,8 @@ export function RichText({ text, className = "", dark, foldLines }: Props) {
         }
         if (s.lang === "error") return <ErrorBlock key={i} text={s.code} />;
         if (s.lang === "drawflow")
-          return <DrawFlowCard key={i} encoded={s.code.trim()} foldHeight={foldLines ? 280 : 560} />;
-        return <CodeBlock key={i} code={s.code} lang={s.lang} foldLines={foldLines} />;
+          return <DrawFlowCard key={i} encoded={s.code.trim()} foldHeight={foldLines ? 280 : 560} compact={compact} />;
+        return <CodeBlock key={i} code={s.code} lang={s.lang} foldLines={foldLines} compact={compact} />;
       })}
     </div>
   );
@@ -101,7 +102,7 @@ async function openInNewTab(makeUrl: () => Promise<string>) {
 }
 
 // 글에 담긴 draw_flow 순서도 (계획서 2-8-1). 내용은 주소 그대로라 서버에 따로 저장하지 않습니다.
-function DrawFlowCard({ encoded, foldHeight }: { encoded: string; foldHeight?: number }) {
+function DrawFlowCard({ encoded, foldHeight, compact }: { encoded: string; foldHeight?: number; compact?: boolean }) {
   const [info, setInfo] = useState<{ title: string; doc: FlowDocument } | null | "bad">(null);
   useEffect(() => {
     let alive = true;
@@ -123,22 +124,24 @@ function DrawFlowCard({ encoded, foldHeight }: { encoded: string; foldHeight?: n
           <b>순서도</b>
           {info ? `${info.title ? ` · ${info.title}` : ""} (도형 ${info.doc.nodes.length}개)` : " 불러오는 중…"}
         </span>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            openInNewTab(async () => drawFlowOpenUrl(encoded, "flow", currentBoardId()));
-          }}
-          className="rounded-lg bg-school px-3 py-1 text-sm text-white"
-        >
-          draw_flow에서 열기
-        </button>
+        {!compact && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openInNewTab(async () => drawFlowOpenUrl(encoded, "flow", currentBoardId()));
+            }}
+            className="rounded-lg bg-school px-3 py-1 text-sm text-white"
+          >
+            draw_flow에서 열기
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function CodeBlock({ code, lang, foldLines }: { code: string; lang: string; foldLines?: number }) {
+function CodeBlock({ code, lang, foldLines, compact }: { code: string; lang: string; foldLines?: number; compact?: boolean }) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
   const lines = code.split("\n");
@@ -163,7 +166,7 @@ function CodeBlock({ code, lang, foldLines }: { code: string; lang: string; fold
       <div className="flex items-center justify-between bg-black/25 px-2.5 py-1 text-[11px] text-[#A9C3B8]">
         <span className="flex-1">{langLabel(lang)}</span>
         {/* 의사코드·파이썬은 draw_flow 에서 순서도로 바꿔 볼 수 있습니다 */}
-        {(normalizeLang(lang) === "pseudocode" || normalizeLang(lang) === "python") && (
+        {!compact && (normalizeLang(lang) === "pseudocode" || normalizeLang(lang) === "python") && (
           <button
             type="button"
             onClick={(e) => {
