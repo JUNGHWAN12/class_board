@@ -410,7 +410,9 @@ function BoardScreen({ boardId }: { boardId: string }) {
         {othersHidden && board && (
           <div className="mb-4 rounded-[10px] border border-cream-line bg-cream px-4 py-3 text-sm text-cream-ink">
             {board.reveal_mode === "after_submit"
-              ? "🔒 내 글을 먼저 올리면 친구들 글을 볼 수 있어요. (베끼기 방지)"
+              ? board.default_kind === "assignment"
+                ? "🔒 '+ 글쓰기'로 과제 제출 글을 올리면 친구들 글을 볼 수 있어요. 대화 글은 제출로 세지 않아요. (베끼기 방지)"
+                : "🔒 내 글을 먼저 올리면 친구들 글을 볼 수 있어요. (베끼기 방지)"
               : "🔒 선생님이 공개하면 친구들 글을 볼 수 있어요. 지금은 내 글만 보여요."}
           </div>
         )}
