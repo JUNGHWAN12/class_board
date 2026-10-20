@@ -2,18 +2,22 @@
 
 import type { Session } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { getSupabase, isConfigured, SCHOOL_DOMAIN } from "@/lib/supabase";
+import { getDemoUser, onDemoUserChange, setDemoUser, type DemoUser } from "@/lib/demo/users";
+import { getSupabase, isConfigured, SCHOOL_DOMAINS } from "@/lib/store/supabaseClient";
 
 type AuthState = {
+  demo: boolean; // Supabase 없이 가상 사용자로 체험하는 중
   loading: boolean;
-  session: Session | null;
+  signedIn: boolean;
   userId: string | null;
   name: string;
   email: string;
+  avatar: string | null;
   isSchoolUser: boolean;
   isTeacher: boolean;
   signIn: () => Promise<void>;
   signOut: () => Promise<void>;
+  switchDemoUser: (id: string) => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -25,13 +29,46 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [loading, setLoading] = useState(isConfigured);
+  return isConfigured() ? <SupabaseAuth>{children}</SupabaseAuth> : <DemoAuth>{children}</DemoAuth>;
+}
+
+const noop = async () => {};
+
+// 체험 모드: 머리글의 '교사 화면으로 보기' 버튼으로 교사·학생을 바꿉니다.
+function DemoAuth({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<DemoUser | null>(null);
+
+  useEffect(() => {
+    // 저장된 사용자는 브라우저에서만 읽을 수 있어서 화면이 뜬 뒤에 불러옵니다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUser(getDemoUser());
+    return onDemoUserChange(() => setUser(getDemoUser()));
+  }, []);
+
+  const value: AuthState = {
+    demo: true,
+    loading: user === null,
+    signedIn: user !== null,
+    userId: user?.id ?? null,
+    name: user?.name ?? "",
+    email: user?.email ?? "",
+    avatar: null,
+    isSchoolUser: true,
+    isTeacher: user?.isTeacher ?? false,
+    signIn: noop,
+    signOut: noop,
+    switchDemoUser: setDemoUser,
+  };
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+function SupabaseAuth({ children }: { children: React.ReactNode }) {
+  const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);
   const [isSchoolUser, setIsSchoolUser] = useState(false);
   const [isTeacher, setIsTeacher] = useState(false);
 
   useEffect(() => {
-    if (!isConfigured()) return;
     const supabase = getSupabase();
     let cancelled = false;
     let lastUserId: string | null | undefined;
@@ -78,8 +115,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       provider: "google",
       options: {
         redirectTo: window.location.href,
-        // hd: 구글 로그인 화면에서 학교 계정만 보이도록 안내 (실제 차단은 DB 에서 합니다)
-        queryParams: SCHOOL_DOMAIN ? { hd: SCHOOL_DOMAIN, prompt: "select_account" } : { prompt: "select_account" },
+        // hd: 구글 로그인 화면에서 학교 계정만 보이도록 안내 (실제 차단은 DB 에서 합니다).
+        // hd 는 도메인을 하나만 받아서, 도메인이 여러 개면 넘기지 않습니다.
+        queryParams:
+          SCHOOL_DOMAINS.length === 1
+            ? { hd: SCHOOL_DOMAINS[0], prompt: "select_account" }
+            : { prompt: "select_account" },
       },
     });
   }, []);
@@ -90,15 +131,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const meta = session?.user.user_metadata ?? {};
   const value: AuthState = {
+    demo: false,
     loading,
-    session,
+    signedIn: Boolean(session),
     userId: session?.user.id ?? null,
     name: (meta.full_name as string) || (meta.name as string) || session?.user.email || "",
     email: session?.user.email ?? "",
+    avatar: (meta.avatar_url as string) || null,
     isSchoolUser,
     isTeacher,
     signIn,
     signOut,
+    switchDemoUser: () => {},
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

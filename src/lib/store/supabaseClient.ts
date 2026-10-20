@@ -2,9 +2,14 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 let client: SupabaseClient | null = null;
 
-export const SCHOOL_DOMAIN = process.env.NEXT_PUBLIC_SCHOOL_DOMAIN || "";
+// 학교 구글 도메인 (여러 개면 쉼표로 구분). 화면 안내용이고, 실제 차단은 DB 의 school_domains 표가 합니다.
+export const SCHOOL_DOMAINS = (process.env.NEXT_PUBLIC_SCHOOL_DOMAIN || "")
+  .split(",")
+  .map((d) => d.trim().toLowerCase())
+  .filter(Boolean);
 export const IMAGE_BUCKET = "post-images";
 
+// Supabase 키가 있으면 실제 DB, 없으면 브라우저에만 저장하는 체험 모드로 동작합니다.
 export function isConfigured() {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -24,9 +29,4 @@ export function getSupabase(): SupabaseClient {
     });
   }
   return client;
-}
-
-export function imageUrl(path: string | null) {
-  if (!path) return null;
-  return getSupabase().storage.from(IMAGE_BUCKET).getPublicUrl(path).data.publicUrl;
 }

@@ -5,6 +5,36 @@
 - 화면: Next.js + Tailwind CSS (Vercel 무료 배포)
 - 백엔드/DB: Supabase (PostgreSQL, 구글 로그인, 사진 저장)
 
+## 바로 체험해 보기 (Supabase 없이)
+
+```bash
+npm install
+npm run dev                  # http://localhost:3000
+```
+
+`.env.local` 이 없으면 **체험 모드**로 열립니다. 정보·인공지능 기초·데이터 과학 예시 게시판 5개와 가상 학생 28명·교사 1명이 들어 있고, 데이터는 이 브라우저(localStorage)에만 저장됩니다.
+
+- 머리글의 **교사 화면으로 보기** 버튼으로 교사·학생을 바꿉니다. 학생 이름을 눌러 다른 학생으로도 바꿀 수 있어요.
+- 탭을 두 개 열면 한쪽은 교사, 한쪽은 학생으로 두고 잠그기·숨기기가 몇 초 뒤 반영되는 것을 볼 수 있어요.
+- 화면 아래 **체험 데이터 초기화**로 처음 상태로 되돌립니다.
+
+Supabase 키를 넣으면 같은 화면이 실제 DB·구글 로그인으로 동작합니다 (`src/lib/store/` 에서 `demoStore` ↔ `supabaseStore` 를 자동으로 고릅니다).
+
+## 화면 구성 (UI 초안 통합안)
+
+- **첫 화면**: 주제별로 독립된 게시판 카드 (열림·잠김, 글 수, 기본 보기). 교사는 새 주제 게시판을 만들 수 있어요.
+- **게시판 안**: 다섯 가지 보기를 탭으로 바꿔 봅니다. 교사가 게시판마다 기본 보기를 정하고, 학생이 고른 보기는 그 브라우저에 기억됩니다.
+  - 담벼락(포스트잇) · 목록(번호·제목 표) · 피드(사진 크게) · 칸별(모둠·질문 종류별 칸) · 대화(공지 고정, 바로 보내기)
+- **교사 도구 띠**: 참여 현황, 게시판 잠그기, 사진 올리기 허용, 기본 보기, 엑셀(CSV) 내보내기
+- 공통 테마: 학교 초록 머리글, 노란 글쓰기 버튼 (휴대폰에서는 오른쪽 아래에 떠 있음)
+
+## 컴퓨터 과목 기능 (계획서 2장 필수 항목)
+
+- **코드 블록**: 글쓰기 창의 `</> 코드 넣기` 에서 언어(Python, C, Java, JavaScript, HTML, CSS, SQL, 기타)를 고르면 ```` ```python ```` 상자가 들어갑니다. 문법 색, 줄 번호, 복사 버튼, 코딩 글꼴(나눔고딕코딩), 가로 스크롤, 담벼락 카드에서는 10줄 넘으면 접기. 글쓰기 창과 댓글에서 Tab = 스페이스 4칸. 학생이 `<script>` 를 올려도 글자로만 보입니다.
+- **글 종류**: 일반 / 질문 / 코드 공유 / 과제 제출. 게시판마다 기본 종류가 있고, 위쪽 칩으로 종류별·미해결 질문만 거를 수 있어요.
+- **에러 질문 양식**: '질문'을 고르면 ① 내 코드 ② 에러 메시지 ③ 해 본 것 칸이 나오고, 에러는 빨간 상자로 보여요. 질문한 학생이나 교사가 댓글을 **채택**하면 '해결됨'.
+- **제출 후 공개**: 게시판마다 친구 글 공개를 '항상 / 제출하면 / 교사가 공개할 때' 중에서 고릅니다. 학생은 조건을 채우기 전에는 자기 글만 보이고, DB 읽기 함수에서 막아서 화면을 조작해도 볼 수 없어요. 교사 띠에 제출 인원이 보여요.
+
 ## 기능
 
 - 학교 구글 계정 로그인 (다른 도메인 계정은 DB 에서 차단)
@@ -17,10 +47,10 @@
 
 ### 1. Supabase 프로젝트 만들기
 1. https://supabase.com 에서 새 프로젝트를 만듭니다 (Free, 지역은 Seoul 추천).
-2. **SQL Editor** 에 `supabase/migrations/0001_init.sql` 내용을 통째로 붙여넣고 실행합니다.
+2. **SQL Editor** 에 `supabase/migrations/0001_init.sql`, `0002_topic_boards.sql`, `0003_computer_class.sql`, `0004_school_domains.sql` 내용을 차례로 통째로 붙여넣고 실행합니다.
 3. 같은 SQL Editor 에서 학교 도메인과 교사 이메일을 넣습니다.
    ```sql
-   update app_config set allowed_domain = 'school.kr';   -- 학교 구글 도메인
+   insert into school_domains (domain) values ('onedu.jje.go.kr');  -- 학교 구글 도메인마다 한 줄 (비워 두면 모든 구글 계정 허용)
    insert into teachers (email) values ('teacher@school.kr');  -- 교사마다 한 줄
    ```
 
@@ -34,16 +64,16 @@
 1. https://vercel.com 에서 이 GitHub 저장소를 가져옵니다.
 2. 환경 변수 3개를 넣습니다 (`.env.example` 참고).
    - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Supabase > Project Settings > API)
-   - `NEXT_PUBLIC_SCHOOL_DOMAIN` (예: `school.kr`)
+   - `NEXT_PUBLIC_SCHOOL_DOMAIN` (예: `onedu.jje.go.kr`, 여러 개면 쉼표로 구분)
 3. Deploy.
 
 ### 4. 일시정지 방지
 무료 프로젝트는 1주일 동안 요청이 없으면 멈춥니다. GitHub 저장소 Settings > Secrets and variables > Actions 에 `SUPABASE_URL`, `SUPABASE_ANON_KEY` 를 넣으면 `.github/workflows/keep-alive.yml` 이 3일마다 깨워 둡니다.
 
-## 로컬에서 실행
+## 로컬에서 실제 DB 로 실행
 
 ```bash
-cp .env.example .env.local   # 값 채우기
+cp .env.example .env.local   # 값 채우기 (비워 두면 체험 모드)
 npm install
 npm run dev                  # http://localhost:3000
 ```
