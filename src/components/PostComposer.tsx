@@ -11,6 +11,8 @@ type Props = {
   canAttach: boolean;
   onClose: () => void;
   onSubmit: (input: PostInput) => Promise<boolean>;
+  /** 처음에 채워 둘 내용 (draw_flow 에서 보낸 글) */
+  initial?: { kind: PostKind; title: string; content: string };
 };
 
 // 질문 양식 칸을 글 하나로 합칩니다. RichText 가 ```error 를 빨간 상자로 보여줍니다.
@@ -46,11 +48,11 @@ function useCodeEditing(value: string, setValue: (v: string) => void) {
   return { ref, insert, onKeyDown };
 }
 
-export function PostComposer({ board, canAttach, onClose, onSubmit }: Props) {
-  const [kind, setKind] = useState<PostKind>(board.default_kind);
+export function PostComposer({ board, canAttach, onClose, onSubmit, initial }: Props) {
+  const [kind, setKind] = useState<PostKind>(initial?.kind ?? board.default_kind);
   const [section, setSection] = useState(board.sections[0] ?? "");
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [content, setContent] = useState(initial?.content ?? "");
   // 질문 양식
   const [ask, setAsk] = useState("");
   const [lang, setLang] = useState("python");

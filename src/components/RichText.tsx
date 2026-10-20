@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { highlight, langLabel } from "@/lib/code";
+import { useEffect, useState } from "react";
+import { highlight, langLabel, normalizeLang } from "@/lib/code";
+import { currentBoardId, decodeDrawFlowLink, drawFlowOpenUrl, encodePayload } from "@/lib/drawflow";
 
 // 글 내용 표시 (계획서 2-1).
 //  ```python ... ```  → 코드 상자 (문법 색, 줄 번호, 복사 버튼, 가로 스크롤)
 //  ```error ... ```   → 빨간 테두리 에러 메시지 상자 (질문 양식)
+//  ```drawflow z… ``` → draw_flow 순서도 카드 ([draw_flow에서 열기])
 //  `한 줄`            → 인라인 코드
 // 일반 글은 HTML 로 해석하지 않고 글자 그대로 보여줘서 안전합니다.
 
@@ -54,6 +56,7 @@ export function RichText({ text, className = "", dark, foldLines }: Props) {
           ) : null;
         }
         if (s.lang === "error") return <ErrorBlock key={i} text={s.code} />;
+        if (s.lang === "drawflow") return <DrawFlowCard key={i} encoded={s.code.trim()} />;
         return <CodeBlock key={i} code={s.code} lang={s.lang} foldLines={foldLines} />;
       })}
     </div>
@@ -81,6 +84,55 @@ function ErrorBlock({ text }: { text: string }) {
   );
 }
 
+// 새 탭을 먼저 열고(팝업 차단 방지) 주소를 나중에 넣습니다.
+async function openInNewTab(makeUrl: () => Promise<string>) {
+  const win = window.open("", "_blank");
+  try {
+    const url = await makeUrl();
+    if (win) {
+      win.opener = null;
+      win.location.href = url;
+    } else window.location.href = url;
+  } catch {
+    win?.close();
+  }
+}
+
+// 글에 담긴 draw_flow 순서도 (계획서 2-8-1). 내용은 주소 그대로라 서버에 따로 저장하지 않습니다.
+function DrawFlowCard({ encoded }: { encoded: string }) {
+  const [info, setInfo] = useState<{ title: string; shapes: number } | null | "bad">(null);
+  useEffect(() => {
+    let alive = true;
+    decodeDrawFlowLink(encoded).then(
+      (l) => alive && setInfo(l.kind === "flow" ? { title: l.title || l.doc.title, shapes: l.doc.nodes.length } : "bad"),
+      () => alive && setInfo("bad"),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [encoded]);
+  if (info === "bad") return <p className="my-2 text-sm text-muted">(순서도를 읽을 수 없어요)</p>;
+  return (
+    <div className="my-2 flex flex-wrap items-center gap-2 rounded-lg border border-school/40 bg-leaf px-3 py-2 text-left text-ink">
+      <span aria-hidden>📐</span>
+      <span className="min-w-0 flex-1 text-sm">
+        <b>순서도</b>
+        {info ? ` · ${info.title || "제목 없음"} (도형 ${info.shapes}개)` : " 불러오는 중…"}
+      </span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          openInNewTab(async () => drawFlowOpenUrl(encoded, "flow", currentBoardId()));
+        }}
+        className="rounded-lg bg-school px-3 py-1 text-sm text-white"
+      >
+        draw_flow에서 열기
+      </button>
+    </div>
+  );
+}
+
 function CodeBlock({ code, lang, foldLines }: { code: string; lang: string; foldLines?: number }) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
@@ -104,7 +156,27 @@ function CodeBlock({ code, lang, foldLines }: { code: string; lang: string; fold
   return (
     <div className="code-block my-2 overflow-hidden rounded-lg bg-[#1C2B27] text-left">
       <div className="flex items-center justify-between bg-black/25 px-2.5 py-1 text-[11px] text-[#A9C3B8]">
-        <span>{langLabel(lang)}</span>
+        <span className="flex-1">{langLabel(lang)}</span>
+        {/* 의사코드·파이썬은 draw_flow 에서 순서도로 바꿔 볼 수 있습니다 */}
+        {(normalizeLang(lang) === "pseudocode" || normalizeLang(lang) === "python") && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openInNewTab(async () =>
+                drawFlowOpenUrl(
+                  await encodePayload({ v: 1, app: "class_board", kind: "pseudocode", title: "", code }),
+                  "pseudocode",
+                  currentBoardId(),
+                ),
+              );
+            }}
+            className="rounded px-1.5 py-0.5 text-white/90 hover:bg-white/15"
+            title="draw_flow에서 이 코드를 순서도로 바꿔 봅니다"
+          >
+            draw_flow에서 열기
+          </button>
+        )}
         <button type="button" onClick={copy} className="rounded px-1.5 py-0.5 text-white/90 hover:bg-white/15">
           {copied ? "복사됨 ✓" : "복사"}
         </button>

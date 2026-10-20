@@ -10,6 +10,7 @@ import { PostModal } from "./PostModal";
 import type { ViewProps } from "./postBits";
 import { getStore } from "@/lib/store";
 import { usePolling } from "@/lib/usePolling";
+import { takeDraft, type PostDraft } from "@/lib/drawflow";
 import { kindLabel, VIEWS, type RevealMode, type Board, type ExportRow, type Post, type PostChanges, type PostInput, type ViewKey } from "@/lib/types";
 
 // 새 글 확인 간격. 무료 요금제에 맞춰 실시간 연결 대신 짧은 간격으로 확인합니다.
@@ -54,6 +55,8 @@ function BoardScreen({ boardId }: { boardId: string }) {
   const [myLikes, setMyLikes] = useState<Set<string>>(new Set());
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
+  // draw_flow 에서 보낸 내용 (/share 에서 이 게시판을 골랐을 때)
+  const [draft, setDraft] = useState<PostDraft | null>(null);
   const [pickedView, setPickedView] = useState<ViewKey | null>(null);
   const [error, setError] = useState("");
   const sinceRef = useRef<string | null>(null);
@@ -119,6 +122,23 @@ function BoardScreen({ boardId }: { boardId: string }) {
     if (!userId) return;
     getStore().myLikes(userId).then(setMyLikes, showError);
   }, [userId, showError]);
+
+  // /share 에서 맡겨 둔 글이 있으면 게시판을 불러온 뒤 글쓰기 창을 채워서 엽니다.
+  const boardLoaded = board !== null;
+  const lockedForMe = Boolean(board?.is_locked && !isTeacher);
+  useEffect(() => {
+    if (!boardLoaded) return;
+    const d = takeDraft(boardId);
+    if (!d) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- 탭에 맡겨 둔 값은 화면이 뜬 뒤에 읽습니다 */
+    if (lockedForMe) {
+      setError("게시판이 잠겨 있어 draw_flow에서 보낸 글을 올릴 수 없어요.");
+      return;
+    }
+    setDraft(d);
+    setComposing(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [boardLoaded, boardId, lockedForMe]);
 
   usePolling(loadPosts, POLL_MS);
   usePolling(loadBoard, BOARD_POLL_MS);
@@ -434,8 +454,17 @@ function BoardScreen({ boardId }: { boardId: string }) {
         )}
       </main>
 
-      {composing && board && (
-        <PostComposer board={board} canAttach={canAttach} onClose={() => setComposing(false)} onSubmit={createPost} />
+      {composing && board && canWrite && (
+        <PostComposer
+          board={board}
+          canAttach={canAttach}
+          initial={draft ?? undefined}
+          onClose={() => {
+            setComposing(false);
+            setDraft(null);
+          }}
+          onSubmit={createPost}
+        />
       )}
 
       {openPost && (
