@@ -3,8 +3,8 @@ import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "우리 반 게시판",
-  description: "학교 구글 계정으로 함께 쓰는 주제별 수업 게시판",
+  title: "info_board",
+  description: "정보수업을 위한 게시판",
 };
 
 export const viewport: Viewport = {

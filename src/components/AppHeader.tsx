@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useAuth } from "./AuthProvider";
 import { DEMO_STUDENTS, DEMO_TEACHER } from "@/lib/demo/users";
 
-// 반 이름은 아직 고정값입니다. (나중에 반 설정이 생기면 그 값으로 바꿉니다)
-export const CLASS_NAME = "2학년 3반";
+// 사이트 이름과 소개 문구 (머리글, 브라우저 탭 제목에 쓰임)
+export const SITE_NAME = "info_board";
+export const SITE_TAGLINE = "정보수업을 위한 게시판";
 
 type Props = { subTitle: string; title: string; back?: boolean };
 

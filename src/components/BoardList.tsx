@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useAuth } from "./AuthProvider";
-import { AppHeader, CLASS_NAME } from "./AppHeader";
+import { AppHeader, SITE_NAME, SITE_TAGLINE } from "./AppHeader";
 import { Modal } from "./Modal";
 import { getStore } from "@/lib/store";
 import { usePolling } from "@/lib/usePolling";
@@ -29,7 +29,7 @@ export function BoardList() {
 
   return (
     <>
-      <AppHeader subTitle={`${CLASS_NAME} · 정보 · 인공지능 · 데이터 과학`} title="우리 반 게시판" />
+      <AppHeader subTitle={SITE_TAGLINE} title={SITE_NAME} />
       <main className="mx-auto box-border flex w-full max-w-[1240px] flex-col gap-4 px-4 pb-10 pt-7 sm:px-6">
         <p className="text-[15px] text-ink-soft">
           게시판마다 글·댓글·좋아요가 따로 관리돼요. 들어가서 원하는 보기로 바꿔 볼 수 있어요.
