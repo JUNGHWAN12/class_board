@@ -10,12 +10,21 @@ import { kindLabel, type Board } from "@/lib/types";
 import {
   decodeDrawFlowLink,
   draftFromLink,
+  hasFlowAndCode,
   putDraft,
   readShareHash,
   stashIncoming,
   takeIncoming,
+  type DrawFlowLink,
   type PostDraft,
+  type ShareContent,
 } from "@/lib/drawflow";
+
+const CONTENT_CHOICES: { key: ShareContent; label: string }[] = [
+  { key: "both", label: "순서도 + 의사코드" },
+  { key: "flow", label: "순서도만" },
+  { key: "code", label: "의사코드만" },
+];
 
 // 로그인 전에 주소의 내용을 맡겨 둡니다 (로그인하러 다녀오면 # 뒤가 사라질 수 있어서).
 export function ShareStash() {
@@ -32,6 +41,8 @@ export function ShareView() {
   const [error, setError] = useState("");
   const [boards, setBoards] = useState<Board[] | null>(null);
   const [boardId, setBoardId] = useState("");
+  const [link, setLink] = useState<DrawFlowLink | null>(null);
+  const [content, setContent] = useState<ShareContent>("both");
 
   useEffect(() => {
     const hash = window.location.hash || takeIncoming();
@@ -45,9 +56,10 @@ export function ShareView() {
       return;
     }
     let alive = true;
-    decodeDrawFlowLink(d)
-      .then(draftFromLink)
-      .then((dr) => alive && setDraft(dr), (e: Error) => alive && setError(e.message));
+    decodeDrawFlowLink(d).then(
+      (l) => alive && setLink(l),
+      (e: Error) => alive && setError(e.message),
+    );
     getStore()
       .listBoards()
       .then(
@@ -65,6 +77,19 @@ export function ShareView() {
     // isTeacher 는 처음 한 번만 봅니다 (로그인 뒤에만 이 화면이 보임)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 고른 내용(둘 다 / 순서도만 / 의사코드만)으로 미리보기와 글쓰기 내용을 만듭니다
+  useEffect(() => {
+    if (!link) return;
+    let alive = true;
+    draftFromLink(link, content).then(
+      (dr) => alive && setDraft(dr),
+      (e: Error) => alive && setError(e.message),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [link, content]);
 
   const go = () => {
     if (!draft || !boardId) return;
@@ -93,9 +118,39 @@ export function ShareView() {
               <RichText text={draft.content} className="text-[15px] leading-relaxed" />
             </section>
             <section className="flex flex-col gap-3 rounded-xl border border-line bg-white p-4">
+              {link && hasFlowAndCode(link) && (
+                <fieldset className="flex flex-col gap-1.5 text-sm">
+                  <legend className="mb-1">무엇을 올릴까요?</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {CONTENT_CHOICES.map((c) => (
+                      <label
+                        key={c.key}
+                        className={`cursor-pointer rounded-full border px-3.5 py-1.5 ${
+                          content === c.key ? "border-school bg-school text-white" : "border-line bg-white text-ink"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="share-content"
+                          value={c.key}
+                          checked={content === c.key}
+                          onChange={() => setContent(c.key)}
+                          className="sr-only"
+                        />
+                        {c.label}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
               <label className="flex flex-col gap-1 text-sm">
                 어느 게시판에 올릴까요?
-                <select value={boardId} onChange={(e) => setBoardId(e.target.value)} className="field" disabled={!boards}>
+                <select
+                  value={boardId}
+                  onChange={(e) => setBoardId(e.target.value)}
+                  className="field"
+                  disabled={!boards}
+                >
                   {boards === null && <option>불러오는 중…</option>}
                   {boards?.map((b) => (
                     <option key={b.id} value={b.id} disabled={b.is_locked && !isTeacher}>
@@ -105,7 +160,9 @@ export function ShareView() {
                 </select>
               </label>
               {boards?.length === 0 && <p className="text-sm text-muted">아직 게시판이 없어요.</p>}
-              <p className="text-xs text-muted">글쓰기 창에 내용이 채워져 열려요. 확인한 뒤 [올리기]를 눌러야 올라가요.</p>
+              <p className="text-xs text-muted">
+                글쓰기 창에 내용이 채워져 열려요. 확인한 뒤 [올리기]를 눌러야 올라가요.
+              </p>
               <button type="button" onClick={go} disabled={!boardId} className="write-btn self-end">
                 이 게시판에 글쓰기
               </button>

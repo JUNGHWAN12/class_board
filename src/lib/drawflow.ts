@@ -235,13 +235,23 @@ async function flowBlock(title: string, doc: FlowDocument) {
   return codeBlock("drawflow", await encodePayload({ v: 1, app: "class_board", kind: "flow", title, doc }));
 }
 
-export async function draftFromLink(link: DrawFlowLink): Promise<PostDraft> {
+/** 순서도와 의사코드가 함께 왔을 때 무엇을 올릴지 */
+export type ShareContent = "both" | "flow" | "code";
+
+/** 순서도와 의사코드가 둘 다 들어 있어 고를 수 있는 내용인지 */
+export function hasFlowAndCode(link: DrawFlowLink): boolean {
+  return link.kind === "flow" && !!link.doc.pseudocode?.trim() && link.doc.nodes.length > 0;
+}
+
+export async function draftFromLink(link: DrawFlowLink, content: ShareContent = "both"): Promise<PostDraft> {
   if (link.kind === "pseudocode") {
     return { kind: "code", title: link.title, content: codeBlock("pseudocode", link.code) };
   }
   if (link.kind === "flow") {
-    const parts = [await flowBlock(link.title || link.doc.title, link.doc)];
-    if (link.doc.pseudocode?.trim()) parts.push(codeBlock("pseudocode", link.doc.pseudocode));
+    const pick = hasFlowAndCode(link) ? content : "both";
+    const parts: string[] = [];
+    if (pick !== "code") parts.push(await flowBlock(link.title || link.doc.title, link.doc));
+    if (pick !== "flow" && link.doc.pseudocode?.trim()) parts.push(codeBlock("pseudocode", link.doc.pseudocode));
     return { kind: "code", title: link.title || link.doc.title, content: parts.join("\n") };
   }
   const g = link.grade;
