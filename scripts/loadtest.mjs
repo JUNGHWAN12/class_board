@@ -54,21 +54,41 @@ function pct(sorted, p) {
 
 // ---------------------------------------------------------------- 요청
 let token = "";
+const TIMEOUT_MS = 20_000;
+let inFlight = 0;
+
+// AbortSignal.timeout 만으로는 요청이 끝나지 않는 경우가 있어서(첫 실행에서 멈춤),
+// 직접 만든 타이머로 abort 하고, 그래도 안 끝나면 기다리지 않고 실패로 셉니다.
+function withTimeout(run) {
+  const ac = new AbortController();
+  let timer;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      ac.abort();
+      reject(Object.assign(new Error("timeout 20s"), { name: "TimeoutError" }));
+    }, TIMEOUT_MS);
+  });
+  return Promise.race([run(ac.signal), guard]).finally(() => clearTimeout(timer));
+}
+
 async function call(name, method, path, body, { prefer } = {}) {
   const t0 = performance.now();
+  inFlight++;
   try {
-    const res = await fetch(BASE + path, {
-      method,
-      headers: {
-        apikey: KEY,
-        Authorization: `Bearer ${token || KEY}`,
-        "Content-Type": "application/json",
-        ...(prefer ? { Prefer: prefer } : {}),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(20_000),
+    const { res, text } = await withTimeout(async (signal) => {
+      const res = await fetch(BASE + path, {
+        method,
+        headers: {
+          apikey: KEY,
+          Authorization: `Bearer ${token || KEY}`,
+          "Content-Type": "application/json",
+          ...(prefer ? { Prefer: prefer } : {}),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
+      });
+      return { res, text: await res.text() };
     });
-    const text = await res.text();
     const ms = performance.now() - t0;
     // 23505: 이미 좋아요한 글 (화면도 무시함)
     const ok = res.ok || (name === "like" && text.includes("23505"));
@@ -78,6 +98,8 @@ async function call(name, method, path, body, { prefer } = {}) {
   } catch (e) {
     record(name, performance.now() - t0, false, e?.name === "TimeoutError" ? "timeout 20s" : e?.message || e);
     return null;
+  } finally {
+    inFlight--;
   }
 }
 const rpc = (name, args) => call(name, "POST", `/rest/v1/rpc/${name}`, args);
@@ -112,11 +134,19 @@ async function setup(userId) {
 
 async function cleanup(boardId) {
   if (!boardId) return;
-  const res = await fetch(`${BASE}/rest/v1/boards?id=eq.${boardId}`, {
-    method: "DELETE",
-    headers: { apikey: KEY, Authorization: `Bearer ${token}` },
-  });
-  console.log(res.ok ? `테스트 게시판 삭제 완료 (${boardId})` : `테스트 게시판 삭제 실패: ${res.status} ${await res.text()}`);
+  try {
+    const { res, text } = await withTimeout(async (signal) => {
+      const res = await fetch(`${BASE}/rest/v1/boards?id=eq.${boardId}`, {
+        method: "DELETE",
+        headers: { apikey: KEY, Authorization: `Bearer ${token}` },
+        signal,
+      });
+      return { res, text: await res.text() };
+    });
+    console.log(res.ok ? `테스트 게시판 삭제 완료 (${boardId})` : `테스트 게시판 삭제 실패: ${res.status} ${text}`);
+  } catch (e) {
+    console.log(`테스트 게시판 삭제 실패: ${e?.message || e} — Supabase 에서 "부하 테스트 … (자동 삭제)" 게시판을 직접 지워주세요.`);
+  }
 }
 
 // ---------------------------------------------------------------- 학생 한 명
@@ -239,10 +269,16 @@ async function main() {
       n += s.times.length;
       f += s.fail;
     }
-    console.log(`${Math.round((Date.now() - start) / 1000)}초: 요청 ${n}건, 실패 ${f}건`);
+    console.log(`${Math.round((Date.now() - start) / 1000)}초: 요청 ${n}건, 실패 ${f}건, 진행 중 ${inFlight}건`);
   }, 30_000);
   try {
-    await Promise.all(Array.from({ length: USERS }, (_, i) => student(i, boardId, userId, endAt)));
+    // 시간이 끝나고 1분 안에 못 끝낸 학생은 기다리지 않고 결과를 냅니다.
+    let finished = 0;
+    const all = Promise.all(
+      Array.from({ length: USERS }, (_, i) => student(i, boardId, userId, endAt).finally(() => finished++)),
+    );
+    const late = await Promise.race([all.then(() => false), sleep(endAt + 60_000 - Date.now()).then(() => true)]);
+    if (late) console.log(`시간이 지나도 끝나지 않은 학생 ${USERS - finished}명은 빼고 결과를 냅니다.`);
   } finally {
     clearInterval(progress);
   }
