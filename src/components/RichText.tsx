@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { highlight, langLabel, normalizeLang } from "@/lib/code";
-import { currentBoardId, decodeDrawFlowLink, drawFlowOpenUrl, encodePayload } from "@/lib/drawflow";
+import { currentBoardId, decodeDrawFlowLink, drawFlowOpenUrl, encodePayload, type FlowDocument } from "@/lib/drawflow";
+import { FlowChart } from "./FlowChart";
 
 // 글 내용 표시 (계획서 2-1).
 //  ```python ... ```  → 코드 상자 (문법 색, 줄 번호, 복사 버튼, 가로 스크롤)
@@ -56,7 +57,8 @@ export function RichText({ text, className = "", dark, foldLines }: Props) {
           ) : null;
         }
         if (s.lang === "error") return <ErrorBlock key={i} text={s.code} />;
-        if (s.lang === "drawflow") return <DrawFlowCard key={i} encoded={s.code.trim()} />;
+        if (s.lang === "drawflow")
+          return <DrawFlowCard key={i} encoded={s.code.trim()} foldHeight={foldLines ? 280 : 560} />;
         return <CodeBlock key={i} code={s.code} lang={s.lang} foldLines={foldLines} />;
       })}
     </div>
@@ -99,12 +101,12 @@ async function openInNewTab(makeUrl: () => Promise<string>) {
 }
 
 // 글에 담긴 draw_flow 순서도 (계획서 2-8-1). 내용은 주소 그대로라 서버에 따로 저장하지 않습니다.
-function DrawFlowCard({ encoded }: { encoded: string }) {
-  const [info, setInfo] = useState<{ title: string; shapes: number } | null | "bad">(null);
+function DrawFlowCard({ encoded, foldHeight }: { encoded: string; foldHeight?: number }) {
+  const [info, setInfo] = useState<{ title: string; doc: FlowDocument } | null | "bad">(null);
   useEffect(() => {
     let alive = true;
     decodeDrawFlowLink(encoded).then(
-      (l) => alive && setInfo(l.kind === "flow" ? { title: l.title || l.doc.title, shapes: l.doc.nodes.length } : "bad"),
+      (l) => alive && setInfo(l.kind === "flow" ? { title: l.title || l.doc.title, doc: l.doc } : "bad"),
       () => alive && setInfo("bad"),
     );
     return () => {
@@ -113,22 +115,25 @@ function DrawFlowCard({ encoded }: { encoded: string }) {
   }, [encoded]);
   if (info === "bad") return <p className="my-2 text-sm text-muted">(순서도를 읽을 수 없어요)</p>;
   return (
-    <div className="my-2 flex flex-wrap items-center gap-2 rounded-lg border border-school/40 bg-leaf px-3 py-2 text-left text-ink">
-      <span aria-hidden>📐</span>
-      <span className="min-w-0 flex-1 text-sm">
-        <b>순서도</b>
-        {info ? ` · ${info.title || "제목 없음"} (도형 ${info.shapes}개)` : " 불러오는 중…"}
-      </span>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          openInNewTab(async () => drawFlowOpenUrl(encoded, "flow", currentBoardId()));
-        }}
-        className="rounded-lg bg-school px-3 py-1 text-sm text-white"
-      >
-        draw_flow에서 열기
-      </button>
+    <div className="my-2 flex flex-col gap-2 rounded-lg border border-school/40 bg-leaf p-2 text-left text-ink">
+      {info && <FlowChart doc={info.doc} maxHeight={foldHeight} />}
+      <div className="flex flex-wrap items-center gap-2 px-1">
+        <span aria-hidden>📐</span>
+        <span className="min-w-0 flex-1 text-sm">
+          <b>순서도</b>
+          {info ? `${info.title ? ` · ${info.title}` : ""} (도형 ${info.doc.nodes.length}개)` : " 불러오는 중…"}
+        </span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openInNewTab(async () => drawFlowOpenUrl(encoded, "flow", currentBoardId()));
+          }}
+          className="rounded-lg bg-school px-3 py-1 text-sm text-white"
+        >
+          draw_flow에서 열기
+        </button>
+      </div>
     </div>
   );
 }
@@ -165,7 +170,13 @@ function CodeBlock({ code, lang, foldLines }: { code: string; lang: string; fold
               e.stopPropagation();
               openInNewTab(async () =>
                 drawFlowOpenUrl(
-                  await encodePayload({ v: 1, app: "class_board", kind: "pseudocode", title: "", code }),
+                  await encodePayload({
+                    v: 1,
+                    app: "class_board",
+                    kind: "pseudocode",
+                    title: "",
+                    code,
+                  }),
                   "pseudocode",
                   currentBoardId(),
                 ),
