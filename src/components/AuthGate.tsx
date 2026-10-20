@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "./AuthProvider";
-import { AppHeader, CLASS_NAME } from "./AppHeader";
+import { AppHeader, SITE_NAME, SITE_TAGLINE } from "./AppHeader";
 import { DemoFooter } from "./DemoFooter";
 import { SCHOOL_DOMAINS } from "@/lib/store";
 
@@ -57,7 +57,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <>
-      <AppHeader subTitle={CLASS_NAME} title="우리 반 게시판" />
+      <AppHeader subTitle={SITE_TAGLINE} title={SITE_NAME} />
       <div className="flex flex-1 flex-col items-center justify-center px-4 py-24 text-center">{children}</div>
     </>
   );

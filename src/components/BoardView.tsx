@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "./AuthProvider";
-import { AppHeader, CLASS_NAME } from "./AppHeader";
+import { AppHeader, SITE_NAME } from "./AppHeader";
 import { ChatView, FeedView, GroupView, ListView, WallView } from "./BoardViews";
 import { PostComposer } from "./PostComposer";
 import { PostModal } from "./PostModal";
@@ -223,7 +223,7 @@ function BoardScreen({ boardId }: { boardId: string }) {
   if (notFound) {
     return (
       <>
-        <AppHeader subTitle={CLASS_NAME} title="게시판을 찾을 수 없어요" back />
+        <AppHeader subTitle={SITE_NAME} title="게시판을 찾을 수 없어요" back />
         <p className="px-4 py-24 text-center text-muted">주소가 바뀌었거나 삭제된 게시판이에요.</p>
       </>
     );
@@ -239,7 +239,7 @@ function BoardScreen({ boardId }: { boardId: string }) {
   return (
     <>
       <AppHeader
-        subTitle={board ? `${CLASS_NAME} · ${board.subject}` : CLASS_NAME}
+        subTitle={board ? `${SITE_NAME} · ${board.subject}` : SITE_NAME}
         title={board?.title ?? "불러오는 중…"}
         back
       />
